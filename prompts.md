@@ -78,3 +78,13 @@ This log tracks every turn, user instruction, agent workflow execution, tool cal
 - **Executed Actions / Tools:**
   - Restored `## 6. Launch Scope & Boundaries` heading in `SPEC.md`.
 - **Status:** `SPEC.md` structure restored.
+
+---
+
+### Entry: 2026-08-26 06:49 PKT
+- **User Prompt:** Connect GitHub repository `https://github.com/sarmad-rj/aniferret.git`, create `.gitignore`, and perform initial commit.
+- **Executed Actions / Tools:**
+  - Initialized git repository, added `.gitignore`, configured `origin` to `https://github.com/sarmad-rj/aniferret.git`.
+  - Updated `.claude/rules/git-conventions.md` with repository URL.
+  - Created initial commit `chore(init): initialize repository structure, agentic rules, and product spec`.
+- **Status:** Local repository initialized and linked to GitHub remote.
