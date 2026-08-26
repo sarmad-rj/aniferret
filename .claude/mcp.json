@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "fastapi-docs": {
+      "command": "npx",
+      "args": ["-y", "fastapi-docs-mcp"]
+    },
+    "puppeteer": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
+    }
+  }
+}

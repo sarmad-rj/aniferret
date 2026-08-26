@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+venv/
+env/
+.venv/
+
+# Environment Variables & Credentials
+.env
+.env.*
+!.env.example
+*.pem
+
+# Python & Pytest
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build & Output
+dist/
+build/
+*.egg-info/
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# IDE & Editor
+.vscode/
+.idea/
+
+# Playwright & Artifact Scratch
+test-results/
+playwright-report/
