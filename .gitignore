@@ -25,6 +25,11 @@ dist/
 build/
 *.egg-info/
 
+# Local databases & vector stores
+*.db
+*.sqlite3
+chroma_store/
+
 # Operating System
 .DS_Store
 Thumbs.db

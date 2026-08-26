@@ -7,6 +7,10 @@
     "puppeteer": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
+    },
+    "aniferret-dossiers": {
+      "command": "backend/.venv/Scripts/python.exe",
+      "args": ["backend/app/mcp_server.py"]
     }
   }
 }

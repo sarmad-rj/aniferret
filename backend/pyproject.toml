@@ -1,0 +1,8 @@
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+# One-off operational scripts (seed/index/ingest CLIs), not core business logic.
+omit = ["app/db/*"]

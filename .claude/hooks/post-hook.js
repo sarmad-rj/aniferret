@@ -21,7 +21,11 @@ runStep('Code Formatter', 'node .claude/hooks/format-code.js', rootDir);
 // 2. Run Backend Tests
 const backendDir = path.join(rootDir, 'backend');
 if (fs.existsSync(path.join(backendDir, 'tests'))) {
-  if (!runStep('Backend Pytest Suite', 'pytest tests -q', backendDir)) {
+  const venvPython = path.join(backendDir, '.venv', 'Scripts', 'python.exe');
+  const pytestCmd = fs.existsSync(venvPython)
+    ? `"${venvPython}" -m pytest tests -q`
+    : 'pytest tests -q';
+  if (!runStep('Backend Pytest Suite', pytestCmd, backendDir)) {
     process.exit(2);
   }
 }
