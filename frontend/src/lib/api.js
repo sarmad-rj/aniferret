@@ -43,3 +43,10 @@ export function postGroupSessionEvaluate(checkpoints) {
 export function fetchAnimeSources(animeSlug) {
   return request(`/anime/${animeSlug}/sources`);
 }
+
+export function postImportAnime(query) {
+  return request("/anime/import", {
+    method: "POST",
+    body: JSON.stringify({ query }),
+  });
+}

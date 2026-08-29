@@ -1,20 +1,42 @@
-"""External metadata ingestion from Jikan REST v4 and AniList GraphQL (SPEC.md D6).
+"""External metadata ingestion from Jikan REST v4 and AniList GraphQL (SPEC.md D6), plus
+the autonomous dynamic ingestion pipeline (search/ID -> metadata + roster -> Gemini fact
+extraction -> persistence -> vector indexing).
 
-Ingestion is a deliberate, on-demand operation (run via app/db/ingest_sources.py), never
-triggered on the request path — external providers are slow/rate-limited/occasionally
-unavailable, and a dossier read must never depend on their uptime.
+The D6 ingestion (fetch_jikan_metadata/fetch_anilist_metadata/ingest_anime_sources) is a
+deliberate, on-demand operation (run via app/db/ingest_sources.py), never triggered on the
+request path — external providers are slow/rate-limited/occasionally unavailable, and a
+dossier read must never depend on their uptime. The dynamic import pipeline (import_anime)
+*is* request-triggered (POST /api/v1/anime/import) since that's the whole point of it, but
+it degrades gracefully at every external step rather than failing the whole import.
 
 Both providers are queried by MAL id: Jikan's own search endpoint is flaky upstream, but
 its by-id lookup is reliable, and AniList's schema accepts an `idMal` argument directly —
 so a single MAL id is enough to look up both, without needing AniList's separate ID space.
+Title search also goes through AniList (its `search` argument is reliable) rather than
+Jikan's search endpoint, for the same reason.
 """
 
+import logging
+import re
+
 import httpx
-from sqlalchemy import delete
+from google import genai
+from google.genai import types
+from pydantic import BaseModel, Field, ValidationError
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.models.anime import Anime
 from app.models.anime_external_metadata import AnimeExternalMetadata
+from app.models.character import Character
+from app.models.faction import Faction
+from app.models.temporal_fact import TemporalFact
+from app.services.faction_classifier import classify_affiliation
+from app.services.reveal_engine import InvalidCheckpointError, parse_checkpoint
+from app.services.vector_store import index_facts
+
+logger = logging.getLogger(__name__)
 
 _TIMEOUT = 15.0
 _ANILIST_URL = "https://graphql.anilist.co"
@@ -128,3 +150,449 @@ def detect_conflicts(anime: Anime, records: list[AnimeExternalMetadata]) -> list
         conflicts.append({"field": "title", "values": title_values})
 
     return conflicts
+
+
+# ---------------------------------------------------------------------------
+# Autonomous dynamic ingestion: search/ID -> metadata + roster -> Gemini fact
+# extraction -> persistence -> vector indexing.
+# ---------------------------------------------------------------------------
+
+
+class AnimeImportError(Exception):
+    """Raised when an anime cannot be resolved, or has no usable metadata from either provider."""
+
+
+class ExtractedFact(BaseModel):
+    """Gemini's structured-output shape for one atomic fact extracted from a character bio."""
+
+    subject: str
+    predicate: str
+    object: str
+    first_revealed_at: str
+    first_hinted_at: str | None = None
+    confidence: float = Field(ge=0.0, le=1.0)
+    faction: str | None = Field(
+        default=None,
+        description="A named group/team/organization the subject belongs to, if evident; else null.",
+    )
+
+
+_ANILIST_SEARCH_QUERY = """
+query ($search: String) {
+  Media(search: $search, type: ANIME) {
+    idMal
+  }
+}
+"""
+
+_ANILIST_CHARACTERS_QUERY = """
+query ($idMal: Int, $perPage: Int) {
+  Media(idMal: $idMal, type: ANIME) {
+    characters(sort: ROLE, perPage: $perPage) {
+      edges {
+        role
+        node {
+          name { full }
+          description(asHtml: false)
+          image { large }
+        }
+      }
+    }
+  }
+}
+"""
+
+_DEFAULT_EPISODE_FALLBACK = 24
+"""Used only when neither provider reports an episode count (e.g. an ongoing/RELEASING
+series like One Piece, where the real total isn't fixed) — a conservative single-season
+default rather than guessing an arbitrarily large number."""
+
+_MAX_CHARACTERS_TO_INGEST = 8
+
+_EXTRACTION_MODEL_NAME = "gemini-3.6-flash"
+
+_AFFILIATION_RE = re.compile(r"Affiliation:[*_]*\s*([^\n\r(]+)", re.IGNORECASE)
+"""Matches AniList's markdown convention, e.g. '__Affiliation:__ Straw Hat Pirates (...)' —
+[*_]* eats the closing bold marker, whether it's asterisks or (AniList's actual style) underscores."""
+
+_BOUNTY_RE = re.compile(r"Bount(?:y|ies):[*_]*\s*([^\n\r(]+)", re.IGNORECASE)
+_POWER_RE = re.compile(r"(?:Devil Fruit|Power|Ability|Haki):[*_]*\s*([^\n\r(]+)", re.IGNORECASE)
+_HEIGHT_RE = re.compile(r"Height:[*_]*\s*([^\n\r(]+)", re.IGNORECASE)
+"""Same structured-bio-line convention as Affiliation: — used to dynamically capture rich
+dossier metadata (bounty, power, height) straight from AniList bio text rather than
+hardcoding it per character."""
+
+_EXTRACTION_SYSTEM_INSTRUCTION = (
+    "You are AniFerret's fact extraction engine. Given a character's public bio/wiki "
+    "description, extract 1 to 3 atomic, spoiler-relevant facts about them as structured "
+    "JSON. Each fact needs: subject (the character's name, exactly as given), predicate "
+    "(a short snake_case relation, e.g. 'true_identity', 'special_ability', "
+    "'family_relation'), object (the revealed content, one sentence, no spoiler markup), "
+    "first_revealed_at (a plausible checkpoint 'S1E<n>' with n between 1 and {max_episode} "
+    "inclusive), first_hinted_at (an earlier checkpoint if the fact is foreshadowed before "
+    "its full reveal, else null), confidence (0.0-1.0: your certainty this is accurate and "
+    "genuinely spoiler-relevant, not trivia), and faction (the name of a team, squad, "
+    "crew, division, guild, or organization the character clearly belongs to, if the bio "
+    "states one — else null; do not guess or infer one that isn't explicitly stated).\n\n"
+    "The bio text may contain spoiler markers: content between ~! and !~ is community-"
+    "flagged as a spoiler by the source. Facts drawn from inside those markers must get a "
+    "first_revealed_at well into the series (a high episode number, not episode 1) — "
+    "reflecting that they're revealed late. Facts drawn from outside those markers (plain "
+    "introductory bio info) should get an early first_revealed_at. Never invent facts the "
+    "text doesn't support, and never output a fact with no textual basis."
+)
+
+
+async def resolve_mal_id(query: str) -> int | None:
+    """Resolve a free-text title or a numeric-string MAL id into a MAL id.
+
+    A purely numeric query is treated as an existing MAL id directly. Otherwise, title
+    search goes through AniList's `search` argument — Jikan's own search endpoint 504s
+    unreliably upstream, but AniList's is stable and returns `idMal` directly.
+    """
+    stripped = query.strip()
+    if stripped.isdigit():
+        return int(stripped)
+
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            response = await client.post(
+                _ANILIST_URL,
+                json={"query": _ANILIST_SEARCH_QUERY, "variables": {"search": stripped}},
+            )
+            response.raise_for_status()
+    except httpx.HTTPError:
+        return None
+
+    media = (response.json().get("data") or {}).get("Media")
+    return media.get("idMal") if media else None
+
+
+async def fetch_character_roster(mal_id: int, limit: int = _MAX_CHARACTERS_TO_INGEST) -> list[dict]:
+    """Fetch up to `limit` characters (main cast first) with their bio text, via AniList.
+
+    AniList's character bios consistently include an 'Affiliation:' line (used to derive
+    factions) and wrap spoiler-sensitive content in ~!...!~ markers (used to steer Gemini's
+    checkpoint placement) — both are why this goes through AniList rather than Jikan, which
+    offers neither on its anime-characters endpoint.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            response = await client.post(
+                _ANILIST_URL,
+                json={
+                    "query": _ANILIST_CHARACTERS_QUERY,
+                    "variables": {"idMal": mal_id, "perPage": limit},
+                },
+            )
+            response.raise_for_status()
+    except httpx.HTTPError:
+        return []
+
+    media = (response.json().get("data") or {}).get("Media")
+    if not media:
+        return []
+
+    edges = (media.get("characters") or {}).get("edges") or []
+    roster = []
+    for edge in edges:
+        node = edge.get("node") or {}
+        name = (node.get("name") or {}).get("full")
+        if name:
+            roster.append(
+                {
+                    "name": name,
+                    "description": node.get("description") or "",
+                    "role": edge.get("role"),
+                    "avatar_url": (node.get("image") or {}).get("large"),
+                }
+            )
+    return roster
+
+
+def _extract_bio_field(description: str, pattern: re.Pattern[str]) -> str | None:
+    """Pull one structured 'Label: value' line out of an AniList bio, dynamically.
+
+    Used for Affiliation, Bounty, Power/Devil Fruit, and Height — all follow the same
+    community-authored markdown convention, so a single helper covers all of them
+    without any per-character hardcoding.
+    """
+    match = pattern.search(description)
+    if not match:
+        return None
+    cleaned = match.group(1).replace("~!", "").replace("!~", "").strip().strip("*").strip()
+    return cleaned or None
+
+
+def _extract_affiliation(description: str) -> str | None:
+    """Pull a character's group/organization from AniList's 'Affiliation:' bio convention."""
+    return _extract_bio_field(description, _AFFILIATION_RE)
+
+
+def _is_checkpoint_in_range(checkpoint: str | None, season_episode_counts: list[int]) -> bool:
+    """Validate a checkpoint actually fits within the anime's declared season lengths.
+
+    This is the exact defensive check that would have caught the One Piece premature-
+    unlock bug: is_revealed() compares (season, episode) tuples with no notion of season
+    length, so an LLM-generated checkpoint that overshoots its season's real length could
+    let a later-season checkpoint prematurely satisfy it. Since this pipeline has no human
+    reviewing Gemini's output before it reaches the DB, checkpoints must be validated here.
+    """
+    if checkpoint is None:
+        return True
+    try:
+        season, episode = parse_checkpoint(checkpoint)
+    except InvalidCheckpointError:
+        return False
+    return 1 <= season <= len(season_episode_counts) and 1 <= episode <= season_episode_counts[season - 1]
+
+
+def extract_facts_from_character(
+    character_name: str, description: str, max_episode: int
+) -> list[ExtractedFact]:
+    """Ask Gemini to extract atomic Temporal Facts from one character's bio text.
+
+    Returns an empty list on a missing API key, empty description, or any failure (network,
+    quota, malformed response) — ingestion must degrade to "no facts extracted", never fail
+    the whole import over one character's extraction call.
+    """
+    settings = get_settings()
+    if not settings.gemini_api_key or not description.strip():
+        return []
+
+    try:
+        client = genai.Client(api_key=settings.gemini_api_key)
+        response = client.models.generate_content(
+            model=_EXTRACTION_MODEL_NAME,
+            contents=f"Character: {character_name}\n\nBio:\n{description[:4000]}",
+            config=types.GenerateContentConfig(
+                system_instruction=_EXTRACTION_SYSTEM_INSTRUCTION.format(max_episode=max_episode),
+                response_mime_type="application/json",
+                response_schema=list[ExtractedFact],
+            ),
+        )
+        raw_facts = response.parsed or []
+    except Exception:
+        logger.warning("Gemini fact extraction failed for %r", character_name, exc_info=True)
+        return []
+
+    validated: list[ExtractedFact] = []
+    for raw in raw_facts:
+        try:
+            validated.append(raw if isinstance(raw, ExtractedFact) else ExtractedFact.model_validate(raw))
+        except ValidationError:
+            continue
+    return validated
+
+
+async def _generate_unique_slug(session: AsyncSession, title: str, mal_id: int) -> str:
+    base = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-") or f"anime-{mal_id}"
+    candidate = base
+    suffix = 2
+    while True:
+        existing = await session.execute(select(Anime).where(Anime.slug == candidate))
+        if existing.scalar_one_or_none() is None:
+            return candidate
+        candidate = f"{base}-{suffix}"
+        suffix += 1
+
+
+_FactionCache = dict[tuple[int | None, str], Faction]
+"""Keyed by (parent_faction_id, name) so a top-level faction and a same-named crew never
+collide, and so repeated affiliations within one roster reuse the same row."""
+
+
+async def _get_or_create_faction(
+    session: AsyncSession, anime_id: int, name: str, parent_id: int | None, cache: _FactionCache
+) -> Faction:
+    key = (parent_id, name)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+
+    faction = Faction(anime_id=anime_id, name=name, parent_id=parent_id)
+    session.add(faction)
+    await session.flush()
+    cache[key] = faction
+    return faction
+
+
+async def _resolve_faction(
+    session: AsyncSession, anime_id: int, affiliation: str, cache: _FactionCache
+) -> Faction:
+    """Resolve a free-text affiliation into a persisted Faction, nesting it under the
+    matching top-level Faction/Crew hierarchy (see faction_classifier) when recognized,
+    or as a flat, standalone faction named after the affiliation otherwise.
+    """
+    top_level_name, crew_name = classify_affiliation(affiliation)
+    if top_level_name is None:
+        return await _get_or_create_faction(session, anime_id, affiliation, None, cache)
+
+    top_level = await _get_or_create_faction(session, anime_id, top_level_name, None, cache)
+    if crew_name is None:
+        return top_level
+    return await _get_or_create_faction(session, anime_id, crew_name, top_level.id, cache)
+
+
+async def _ingest_character(
+    session: AsyncSession,
+    anime: Anime,
+    character_data: dict,
+    max_episode: int,
+    season_episode_counts: list[int],
+    faction_cache: _FactionCache,
+) -> tuple[Character, list[tuple[TemporalFact, str]]]:
+    """Extract facts + rich dossier metadata for one roster entry, persist the Character
+    (with faction/crew classification and a dynamically derived first_revealed_at), and
+    return it alongside the (fact, anime_slug) pairs still pending vector indexing.
+    """
+    name = character_data["name"]
+    description = character_data["description"]
+
+    extracted_facts = extract_facts_from_character(name, description, max_episode)
+
+    # The 'Affiliation:' bio convention isn't universal (One Piece's bios use it,
+    # Naruto's/Bleach's don't) — fall back to whatever Gemini itself identified from
+    # the full bio text when the regex heuristic finds nothing.
+    affiliation = _extract_affiliation(description) or next(
+        (fact.faction for fact in extracted_facts if fact.faction), None
+    )
+    faction = (
+        await _resolve_faction(session, anime.id, affiliation, faction_cache) if affiliation else None
+    )
+
+    valid_facts: list[ExtractedFact] = []
+    for fact_data in extracted_facts:
+        if not _is_checkpoint_in_range(fact_data.first_revealed_at, season_episode_counts):
+            logger.warning(
+                "Dropping extracted fact with out-of-range first_revealed_at=%s for %r",
+                fact_data.first_revealed_at,
+                name,
+            )
+            continue
+        if not _is_checkpoint_in_range(fact_data.first_hinted_at, season_episode_counts):
+            fact_data.first_hinted_at = None  # optional field — drop just the hint, not the fact
+        valid_facts.append(fact_data)
+
+    # A character's own dossier fields (bounty, power, backstory) unlock at whichever
+    # checkpoint is earliest among their own extracted facts — the introduction-arc
+    # signal Gemini already derived from the bio's spoiler markers — falling back to the
+    # very first episode when nothing was extracted for them at all.
+    first_revealed_at = min(
+        (fact_data.first_revealed_at for fact_data in valid_facts), key=parse_checkpoint, default="S1E1"
+    )
+
+    stripped_description = description.replace("~!", "").replace("!~", "").strip()
+
+    character = Character(
+        anime_id=anime.id,
+        name=name,
+        faction_id=faction.id if faction else None,
+        role=character_data.get("role"),
+        avatar_url=character_data.get("avatar_url"),
+        height=_extract_bio_field(description, _HEIGHT_RE),
+        bounty=_extract_bio_field(description, _BOUNTY_RE),
+        power=_extract_bio_field(description, _POWER_RE),
+        backstory=stripped_description or None,
+        first_revealed_at=first_revealed_at,
+    )
+    session.add(character)
+
+    indexed_pairs: list[tuple[TemporalFact, str]] = []
+    for fact_data in valid_facts:
+        fact = TemporalFact(
+            anime_id=anime.id,
+            subject=fact_data.subject,
+            predicate=fact_data.predicate,
+            object=fact_data.object,
+            source_citation=f"AniList character bio — {name}",
+            first_revealed_at=fact_data.first_revealed_at,
+            first_hinted_at=fact_data.first_hinted_at,
+            confidence=fact_data.confidence,
+            source="gemini_extracted",
+        )
+        session.add(fact)
+        indexed_pairs.append((fact, anime.slug))
+
+    return character, indexed_pairs
+
+
+async def ingest_character_roster(
+    session: AsyncSession, anime: Anime, roster: list[dict]
+) -> list[tuple[TemporalFact, str]]:
+    """Persist a fetched character roster onto an already-created Anime: fact extraction,
+    dossier metadata, faction/crew classification, all in one pass. Commits and vector-
+    indexes the result. Returns the (fact, anime_slug) pairs that were indexed.
+
+    Shared by import_anime (full dynamic import) and app/db/seed.py (dynamic roster
+    seeding for launch-corpus anime that shouldn't ship with a hardcoded character list).
+    """
+    season_episode_counts = anime.season_episode_counts or [anime.total_episodes]
+    faction_cache: _FactionCache = {}
+    indexed_pairs: list[tuple[TemporalFact, str]] = []
+
+    for character_data in roster:
+        _character, fact_pairs = await _ingest_character(
+            session, anime, character_data, anime.total_episodes, season_episode_counts, faction_cache
+        )
+        indexed_pairs.extend(fact_pairs)
+
+    await session.commit()
+    for fact, _slug in indexed_pairs:
+        await session.refresh(fact)
+
+    try:
+        index_facts(indexed_pairs)
+    except Exception:
+        logger.warning(
+            "Vector indexing failed for anime %r; facts remain gated via SQL.",
+            anime.slug,
+            exc_info=True,
+        )
+
+    return indexed_pairs
+
+
+async def import_anime(session: AsyncSession, query: str) -> Anime:
+    """End-to-end dynamic ingestion: resolve -> metadata + roster -> Gemini facts -> persist -> index.
+
+    Idempotent by mal_id: if a matching anime already exists, it's returned as-is rather
+    than re-ingested, so repeated imports of the same title don't create duplicate data.
+    """
+    mal_id = await resolve_mal_id(query)
+    if mal_id is None:
+        raise AnimeImportError(f"Could not resolve an anime for {query!r} via Jikan or AniList.")
+
+    existing = await session.execute(select(Anime).where(Anime.mal_id == mal_id))
+    existing_anime = existing.scalar_one_or_none()
+    if existing_anime is not None:
+        return existing_anime
+
+    jikan_data = await fetch_jikan_metadata(mal_id)
+    anilist_data = await fetch_anilist_metadata(mal_id)
+    metadata = jikan_data or anilist_data
+    if metadata is None:
+        raise AnimeImportError(f"No metadata available for MAL id {mal_id} from either provider.")
+
+    title = metadata.get("title") or query.strip()
+    episodes = (jikan_data or {}).get("episodes") or (anilist_data or {}).get("episodes")
+    episodes = episodes or _DEFAULT_EPISODE_FALLBACK
+    season_episode_counts = [episodes]
+    slug = await _generate_unique_slug(session, title, mal_id)
+
+    anime = Anime(
+        slug=slug,
+        title=title,
+        total_episodes=episodes,
+        season_episode_counts=season_episode_counts,
+        mal_id=mal_id,
+        anilist_id=mal_id,
+    )
+    session.add(anime)
+    await session.flush()
+
+    roster = await fetch_character_roster(mal_id)
+    await ingest_character_roster(session, anime, roster)
+
+    await session.refresh(anime)
+    return anime

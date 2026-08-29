@@ -1,6 +1,7 @@
+import { Plus } from "lucide-react";
 import logo from "../logo/AniFerret_Logo.png";
 
-function Header({ animeList, selectedSlug, onSelectAnime }) {
+function Header({ animeList, selectedSlug, onSelectAnime, onOpenImport }) {
   const handleAnimeChange = (event) => {
     onSelectAnime(event.target.value);
   };
@@ -18,19 +19,30 @@ function Header({ animeList, selectedSlug, onSelectAnime }) {
         </span>
       </div>
 
-      {animeList.length > 0 && (
-        <select
-          value={selectedSlug ?? ""}
-          onChange={handleAnimeChange}
-          className="rounded-md border border-[var(--primary-light)] bg-[var(--primary-light)] px-3 py-1.5 text-sm text-[var(--surface)]"
+      <div className="flex items-center gap-2">
+        {animeList.length > 0 && (
+          <select
+            value={selectedSlug ?? ""}
+            onChange={handleAnimeChange}
+            className="rounded-md border border-[var(--primary-light)] bg-[var(--primary-light)] px-3 py-1.5 text-sm text-[var(--surface)]"
+          >
+            {animeList.map((anime) => (
+              <option key={anime.slug} value={anime.slug}>
+                {anime.title}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <button
+          type="button"
+          onClick={onOpenImport}
+          className="inline-flex items-center gap-1 rounded-md border border-[var(--sky)] px-3 py-1.5 text-sm font-medium text-[var(--sky)]"
         >
-          {animeList.map((anime) => (
-            <option key={anime.slug} value={anime.slug}>
-              {anime.title}
-            </option>
-          ))}
-        </select>
-      )}
+          <Plus className="h-3.5 w-3.5" />
+          Import
+        </button>
+      </div>
     </header>
   );
 }

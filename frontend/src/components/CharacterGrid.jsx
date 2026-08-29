@@ -1,6 +1,6 @@
 import CharacterCard from "./CharacterCard";
 
-function CharacterGrid({ characters }) {
+function CharacterGrid({ characters, onSelectCharacter }) {
   if (characters.length === 0) {
     return null;
   }
@@ -12,7 +12,11 @@ function CharacterGrid({ characters }) {
       </h2>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {characters.map((character) => (
-          <CharacterCard key={character.id} character={character} />
+          <CharacterCard
+            key={character.id}
+            character={character}
+            onSelect={onSelectCharacter}
+          />
         ))}
       </div>
     </section>

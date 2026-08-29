@@ -6,6 +6,7 @@ import ProgressSlider from "./components/ProgressSlider";
 import RewatchModeToggle from "./components/RewatchModeToggle";
 import GroupModeModal from "./components/GroupModeModal";
 import GroupModeBanner from "./components/GroupModeBanner";
+import ImportAnimeModal from "./components/ImportAnimeModal";
 import DossierView from "./components/DossierView";
 import SourceConflicts from "./components/SourceConflicts";
 import LoreAssistant from "./components/LoreAssistant";
@@ -19,8 +20,13 @@ function App() {
   const [isRewatchMode, setIsRewatchMode] = useState(false);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [groupCheckpoint, setGroupCheckpoint] = useState(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-  const { animeList, error: animeError } = useAnimeCatalog();
+  const {
+    animeList,
+    error: animeError,
+    refetch: refetchAnimeList,
+  } = useAnimeCatalog();
 
   const selectedAnime =
     animeList.find((anime) => anime.slug === selectedSlug) ?? null;
@@ -63,6 +69,12 @@ function App() {
     setGroupCheckpoint(null);
   };
 
+  const handleAnimeImported = async (importedAnime) => {
+    setIsImportModalOpen(false);
+    await refetchAnimeList();
+    handleSelectAnime(importedAnime.slug);
+  };
+
   const checkpointSequence = selectedAnime
     ? buildCheckpointSequence(selectedAnime.season_episode_counts)
     : [];
@@ -73,6 +85,7 @@ function App() {
         animeList={animeList}
         selectedSlug={selectedSlug}
         onSelectAnime={handleSelectAnime}
+        onOpenImport={() => setIsImportModalOpen(true)}
       />
       <NavBar />
 
@@ -153,6 +166,13 @@ function App() {
           checkpointSequence={checkpointSequence}
           onApply={handleApplyGroupMode}
           onClose={() => setIsGroupModalOpen(false)}
+        />
+      )}
+
+      {isImportModalOpen && (
+        <ImportAnimeModal
+          onImported={handleAnimeImported}
+          onClose={() => setIsImportModalOpen(false)}
         />
       )}
     </div>

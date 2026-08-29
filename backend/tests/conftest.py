@@ -10,7 +10,7 @@ from app import models  # noqa: F401  (registers all ORM models on Base's mapper
 from app.core.database import Base, get_db
 from app.main import app
 from app.models import Anime, Character, Faction, TemporalFact
-from app.services import llm_synthesizer
+from app.services import ingestion_service, llm_synthesizer
 
 test_engine = create_async_engine(
     "sqlite+aiosqlite://",
@@ -43,6 +43,19 @@ async def _seed_fixture_data() -> None:
 
         session.add(
             Character(anime_id=anime.id, name="Lelouch Lamperouge", faction_id=faction.id)
+        )
+        session.add(
+            Character(
+                anime_id=anime.id,
+                name="Suzaku Kururugi",
+                faction_id=None,
+                role="Knight",
+                height="178 cm",
+                avatar_url="https://example.com/suzaku.jpg",
+                power="Lancelot Frame Pilot",
+                backstory="Secretly resents his father, the former Prime Minister of Japan.",
+                first_revealed_at="S1E12",
+            )
         )
 
         session.add_all(
@@ -80,18 +93,21 @@ def _prepare_database() -> Generator[None, None, None]:
 
 @pytest.fixture(autouse=True)
 def _no_live_gemini_calls(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Force the deterministic template path by default in every test.
+    """Force the deterministic/no-op path by default in every test.
 
     Tests must never depend on whether a real GEMINI_API_KEY happens to be present in
     the ambient environment — that would make the suite flaky and hit live network/API
-    calls. Tests in test_rag.py that specifically exercise the LLM path re-patch
-    llm_synthesizer.get_settings themselves, which simply overrides this default.
+    calls. llm_synthesizer and ingestion_service each import get_settings into their own
+    module namespace, so both need patching independently. Tests that specifically
+    exercise a live-key code path re-patch get_settings themselves, which simply
+    overrides this default.
     """
 
     class _NoGeminiSettings:
         gemini_api_key = ""
 
     monkeypatch.setattr(llm_synthesizer, "get_settings", lambda: _NoGeminiSettings())
+    monkeypatch.setattr(ingestion_service, "get_settings", lambda: _NoGeminiSettings())
 
 
 @pytest.fixture

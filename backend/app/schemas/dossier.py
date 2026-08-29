@@ -22,6 +22,22 @@ class CharacterDossierEntry(BaseModel):
     id: int
     name: str
     faction_id: int | None
+    role: str | None = None
+    height: str | None = None
+    avatar_url: str | None = None
+    is_revealed: bool = Field(
+        ..., description="Whether first_revealed_at <= the dossier's checkpoint"
+    )
+    first_revealed_at: str
+    bounty: str | None = Field(
+        default=None, description="Null (masked) until is_revealed is true"
+    )
+    power: str | None = Field(
+        default=None, description="Null (masked) until is_revealed is true"
+    )
+    backstory: str | None = Field(
+        default=None, description="Null (masked) until is_revealed is true"
+    )
     revealed_facts: list[RevealedFact] = Field(default_factory=list)
 
 
@@ -31,6 +47,7 @@ class FactionDossierEntry(BaseModel):
     id: int
     name: str
     description: str | None
+    parent_id: int | None = None
     revealed_facts: list[RevealedFact] = Field(default_factory=list)
 
 

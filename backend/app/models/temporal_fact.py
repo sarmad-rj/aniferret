@@ -24,6 +24,7 @@ class TemporalFact(TimestampMixin, Base):
     first_hinted_at: Mapped[str | None] = mapped_column(String(20), nullable=True)
     confidence: Mapped[float] = mapped_column(Float)
     source: Mapped[str] = mapped_column(String(20), default="curated")
-    """Origin of this fact: 'curated' (hand-authored), 'jikan', 'anilist', or 'wiki' (SPEC.md D6)."""
+    """Origin of this fact: 'curated' (hand-authored), 'jikan', 'anilist', 'wiki' (SPEC.md D6),
+    or 'gemini_extracted' (autonomous ingestion pipeline, app/services/ingestion_service.py)."""
 
     anime: Mapped["Anime"] = relationship(back_populates="facts")

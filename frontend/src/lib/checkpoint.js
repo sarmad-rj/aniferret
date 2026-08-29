@@ -19,3 +19,8 @@ export function formatCheckpointLabel(checkpoint) {
   const [, season, episode] = match;
   return `Season ${season}, Episode ${episode}`;
 }
+
+export function parseCheckpointEpisode(checkpoint) {
+  const match = CHECKPOINT_RE.exec(checkpoint ?? "");
+  return match ? Number(match[2]) : null;
+}

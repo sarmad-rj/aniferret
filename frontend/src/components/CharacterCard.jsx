@@ -1,13 +1,33 @@
 import { Lock, User } from "lucide-react";
 
-function CharacterCard({ character }) {
+function CharacterCard({ character, onSelect }) {
   return (
-    <article className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+    <article
+      onClick={() => onSelect(character)}
+      className="cursor-pointer rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 transition-shadow hover:shadow-md"
+    >
       <div className="mb-2 flex items-center gap-2">
-        <User className="h-4 w-4 text-[var(--primary)]" />
-        <h3 className="text-sm font-semibold text-[var(--text)]">
-          {character.name}
-        </h3>
+        {character.avatar_url ? (
+          <img
+            src={character.avatar_url}
+            alt={character.name}
+            className="h-8 w-8 rounded-full object-cover"
+          />
+        ) : (
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-warm)]">
+            <User className="h-4 w-4 text-[var(--primary)]" />
+          </span>
+        )}
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--text)]">
+            {character.name}
+          </h3>
+          {character.role && (
+            <p className="text-[11px] text-[var(--text-muted)]">
+              {character.role}
+            </p>
+          )}
+        </div>
       </div>
 
       {character.revealed_facts.length === 0 ? (

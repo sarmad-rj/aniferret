@@ -1,6 +1,7 @@
 import { Users } from "lucide-react";
+import CharacterChip from "./CharacterChip";
 
-function FactionCard({ faction, members }) {
+function FactionCard({ faction, members, crews = [], onSelectCharacter }) {
   return (
     <article className="rounded-lg border border-[var(--border)] bg-[var(--surface-warm)] p-4">
       <div className="mb-1 flex items-center gap-2">
@@ -16,22 +17,48 @@ function FactionCard({ faction, members }) {
         </p>
       )}
 
-      <ul className="flex flex-wrap gap-1.5">
-        {members.length === 0 ? (
-          <li className="text-xs text-[var(--text-muted)]">
-            No known members yet
-          </li>
-        ) : (
-          members.map((member) => (
-            <li
+      {members.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5">
+          {members.map((member) => (
+            <CharacterChip
               key={member.id}
-              className="rounded-full bg-[var(--surface)] px-2.5 py-1 text-xs text-[var(--text)]"
-            >
-              {member.name}
-            </li>
-          ))
-        )}
-      </ul>
+              character={member}
+              onSelect={onSelectCharacter}
+            />
+          ))}
+        </ul>
+      )}
+
+      {members.length === 0 && crews.length === 0 && (
+        <p className="text-xs text-[var(--text-muted)]">No known members yet</p>
+      )}
+
+      {crews.length > 0 && (
+        <div className="mt-3 flex flex-col gap-3 border-t border-[var(--border)] pt-3">
+          {crews.map((crew) => (
+            <div key={crew.faction.id}>
+              <h4 className="mb-1.5 text-xs font-semibold text-[var(--primary)]">
+                {crew.faction.name}
+              </h4>
+              {crew.members.length === 0 ? (
+                <p className="text-xs text-[var(--text-muted)]">
+                  No known members yet
+                </p>
+              ) : (
+                <ul className="flex flex-wrap gap-1.5">
+                  {crew.members.map((member) => (
+                    <CharacterChip
+                      key={member.id}
+                      character={member}
+                      onSelect={onSelectCharacter}
+                    />
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </article>
   );
 }

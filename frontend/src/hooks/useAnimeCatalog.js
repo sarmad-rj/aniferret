@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchAnimeList } from "../lib/api";
 
 function useAnimeCatalog() {
@@ -6,9 +6,26 @@ function useAnimeCatalog() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const refetch = useCallback(() => {
+    setIsLoading(true);
+    setError(null);
+
+    return fetchAnimeList()
+      .then((data) => {
+        setAnimeList(data);
+        return data;
+      })
+      .catch((fetchError) => {
+        setError(fetchError);
+        throw fetchError;
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
-    setIsLoading(true);
 
     fetchAnimeList()
       .then((data) => {
@@ -32,7 +49,7 @@ function useAnimeCatalog() {
     };
   }, []);
 
-  return { animeList, isLoading, error };
+  return { animeList, isLoading, error, refetch };
 }
 
 export default useAnimeCatalog;

@@ -9,7 +9,7 @@ from app.schemas.dossier import (
     FactionDossierEntry,
     RevealedFact,
 )
-from app.services.reveal_engine import filter_visible_facts
+from app.services.reveal_engine import filter_visible_facts, is_revealed
 
 
 class AnimeNotFoundError(ValueError):
@@ -44,20 +44,31 @@ async def build_dossier(db: AsyncSession, slug: str, checkpoint: str) -> Dossier
     for fact in visible_facts:
         facts_by_subject.setdefault(fact.subject, []).append(RevealedFact.model_validate(fact))
 
-    characters = [
-        CharacterDossierEntry(
-            id=character.id,
-            name=character.name,
-            faction_id=character.faction_id,
-            revealed_facts=facts_by_subject.get(character.name, []),
+    characters = []
+    for character in anime.characters:
+        character_revealed = is_revealed(character.first_revealed_at, checkpoint)
+        characters.append(
+            CharacterDossierEntry(
+                id=character.id,
+                name=character.name,
+                faction_id=character.faction_id,
+                role=character.role,
+                height=character.height,
+                avatar_url=character.avatar_url,
+                is_revealed=character_revealed,
+                first_revealed_at=character.first_revealed_at,
+                bounty=character.bounty if character_revealed else None,
+                power=character.power if character_revealed else None,
+                backstory=character.backstory if character_revealed else None,
+                revealed_facts=facts_by_subject.get(character.name, []),
+            )
         )
-        for character in anime.characters
-    ]
     factions = [
         FactionDossierEntry(
             id=faction.id,
             name=faction.name,
             description=faction.description,
+            parent_id=faction.parent_id,
             revealed_facts=facts_by_subject.get(faction.name, []),
         )
         for faction in anime.factions

@@ -7,12 +7,16 @@ external metadata ingestion (app/db/ingest_sources.py, SPEC.md D6).
 """
 
 import asyncio
+import logging
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
 from app.models import Anime, Character, Faction, TemporalFact
+from app.services.ingestion_service import fetch_character_roster, ingest_character_roster
+
+logger = logging.getLogger(__name__)
 
 SEED_ANIME: list[dict] = [
     {
@@ -197,7 +201,118 @@ SEED_ANIME: list[dict] = [
             },
         ],
     },
+    {
+        "slug": "one-piece",
+        "title": "One Piece",
+        "total_episodes": 1120,
+        # A single continuous season: the Watch Progress slider represents plain
+        # sequential episode numbers (Ep. 1 -> Ep. 1120) rather than per-arc season
+        # boundaries. Checkpoints below ("S1E<n>") use n as that raw global episode
+        # number directly.
+        "season_episode_counts": [1120],
+        "mal_id": 21,
+        "anilist_id": 21,
+        # Deliberately no "factions" or "characters" keys here: per SPEC.md's Faction
+        # architecture, One Piece's roster and Pirate-Crews/Marines/Warlords/Yonko/
+        # Revolutionary-Army hierarchy are ingested dynamically via _seed_dynamic_roster
+        # below (AniList roster fetch -> app/services/faction_classifier.py
+        # classification), not hand-authored here. It degrades to zero characters/
+        # factions (anime + curated facts still seed fine) if AniList is unreachable.
+        "dynamic_roster_mal_id": 21,
+        "dynamic_roster_limit": 40,
+        "facts": [
+            {
+                "subject": "Monkey D. Luffy",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Gomu Gomu no Mi, granting him a rubber body.",
+                "source_citation": "Episode 1",
+                "first_revealed_at": "S1E1",
+                "first_hinted_at": "S1E1",
+                "confidence": 0.99,
+            },
+            {
+                "subject": "Monkey D. Luffy",
+                "predicate": "combat_technique",
+                "object": "Developed Gear Second, pumping blood at high speed for a burst of speed and striking power.",
+                "source_citation": "Episode 581",
+                "first_revealed_at": "S1E581",
+                "first_hinted_at": "S1E580",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Roronoa Zoro",
+                "predicate": "combat_style",
+                "object": "Master of Santoryu, the Three-Sword Style.",
+                "source_citation": "Episode 2",
+                "first_revealed_at": "S1E2",
+                "first_hinted_at": "S1E2",
+                "confidence": 0.98,
+            },
+            {
+                "subject": "Nami",
+                "predicate": "true_loyalty",
+                "object": "Secretly worked for the Arlong Pirates only to earn enough money to buy back Cocoyasi Village's freedom.",
+                "source_citation": "Episode 37",
+                "first_revealed_at": "S1E37",
+                "first_hinted_at": "S1E31",
+                "confidence": 0.94,
+            },
+            {
+                "subject": "Nico Robin",
+                "predicate": "secret_identity",
+                "object": "Operates as Miss All Sunday, Crocodile's partner within Baroque Works.",
+                "source_citation": "Episode 128",
+                "first_revealed_at": "S1E128",
+                "first_hinted_at": "S1E128",
+                "confidence": 0.93,
+            },
+            {
+                "subject": "Nico Robin",
+                "predicate": "crew_membership",
+                "object": "Joins the Straw Hat Pirates as their archaeologist after the Alabasta incident.",
+                "source_citation": "Episode 296",
+                "first_revealed_at": "S1E296",
+                "first_hinted_at": "S1E296",
+                "confidence": 0.97,
+            },
+            {
+                "subject": "Crocodile",
+                "predicate": "true_identity",
+                "object": "A former Warlord of the Sea secretly leading Baroque Works' Operation Utopia to seize Alabasta.",
+                "source_citation": "Episode 272",
+                "first_revealed_at": "S1E272",
+                "first_hinted_at": "S1E137",
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Portgas D. Ace",
+                "predicate": "true_lineage",
+                "object": "Biological son of the Pirate King, Gol D. Roger, and Luffy's sworn brother.",
+                "source_citation": "Episode 770",
+                "first_revealed_at": "S1E770",
+                "first_hinted_at": "S1E152",
+                "confidence": 0.9,
+            },
+        ],
+    },
 ]
+
+
+async def _seed_dynamic_roster(session: AsyncSession, anime: Anime, mal_id: int, limit: int) -> None:
+    """Best-effort dynamic character/faction ingestion for a launch-corpus anime that
+    intentionally ships with no hardcoded character dictionary. Mirrors the ingestion
+    pipeline's own graceful-degradation contract (app/services/ingestion_service.py):
+    any network or extraction failure leaves the anime seeded with zero characters
+    rather than aborting the whole seed run.
+    """
+    try:
+        roster = await fetch_character_roster(mal_id, limit=limit)
+        if not roster:
+            logger.warning("No dynamic roster returned for %r; seeding without characters.", anime.slug)
+            return
+        await ingest_character_roster(session, anime, roster)
+    except Exception:
+        logger.warning("Dynamic roster ingestion failed for %r.", anime.slug, exc_info=True)
 
 
 async def seed_all(session: AsyncSession) -> None:
@@ -219,7 +334,7 @@ async def seed_all(session: AsyncSession) -> None:
         await session.flush()
 
         faction_by_name: dict[str, Faction] = {}
-        for faction_data in anime_data["factions"]:
+        for faction_data in anime_data.get("factions", []):
             faction = Faction(
                 anime_id=anime.id,
                 name=faction_data["name"],
@@ -229,7 +344,7 @@ async def seed_all(session: AsyncSession) -> None:
             faction_by_name[faction_data["name"]] = faction
         await session.flush()
 
-        for character_data in anime_data["characters"]:
+        for character_data in anime_data.get("characters", []):
             faction = faction_by_name.get(character_data.get("faction"))
             session.add(
                 Character(
@@ -241,6 +356,13 @@ async def seed_all(session: AsyncSession) -> None:
 
         for fact_data in anime_data["facts"]:
             session.add(TemporalFact(anime_id=anime.id, **fact_data))
+
+        dynamic_mal_id = anime_data.get("dynamic_roster_mal_id")
+        if dynamic_mal_id is not None:
+            await session.flush()
+            await _seed_dynamic_roster(
+                session, anime, dynamic_mal_id, anime_data.get("dynamic_roster_limit", 8)
+            )
 
     await session.commit()
 
