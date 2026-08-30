@@ -44,7 +44,16 @@ class _FakeAsyncClient:
 
 async def test_fetch_jikan_metadata_success(monkeypatch) -> None:
     response = _FakeResponse(
-        {"data": {"title": "Code Geass", "episodes": 25, "score": 8.7, "synopsis": "Lore."}}
+        {
+            "data": {
+                "title": "Code Geass",
+                "episodes": 25,
+                "score": 8.7,
+                "synopsis": "Lore.",
+                "images": {"jpg": {"large_image_url": "https://example.com/cover.jpg"}},
+                "genres": [{"name": "Action"}, {"name": "Mecha"}],
+            }
+        }
     )
     monkeypatch.setattr(
         ingestion_service.httpx, "AsyncClient", lambda **kwargs: _FakeAsyncClient(response=response)
@@ -52,7 +61,14 @@ async def test_fetch_jikan_metadata_success(monkeypatch) -> None:
 
     result = await ingestion_service.fetch_jikan_metadata(1575)
 
-    assert result == {"title": "Code Geass", "episodes": 25, "score": 8.7, "synopsis": "Lore."}
+    assert result == {
+        "title": "Code Geass",
+        "episodes": 25,
+        "score": 8.7,
+        "synopsis": "Lore.",
+        "cover_image_url": "https://example.com/cover.jpg",
+        "genres": ["Action", "Mecha"],
+    }
 
 
 async def test_fetch_jikan_metadata_network_failure_returns_none(monkeypatch) -> None:
@@ -81,6 +97,8 @@ async def test_fetch_anilist_metadata_success(monkeypatch) -> None:
                     "episodes": 25,
                     "averageScore": 85,
                     "description": "Lore.",
+                    "coverImage": {"large": "https://example.com/cover.jpg"},
+                    "genres": ["Action", "Mecha"],
                 }
             }
         }
@@ -91,7 +109,14 @@ async def test_fetch_anilist_metadata_success(monkeypatch) -> None:
 
     result = await ingestion_service.fetch_anilist_metadata(1575)
 
-    assert result == {"title": "Code Geass", "episodes": 25, "score": 8.5, "synopsis": "Lore."}
+    assert result == {
+        "title": "Code Geass",
+        "episodes": 25,
+        "score": 8.5,
+        "synopsis": "Lore.",
+        "cover_image_url": "https://example.com/cover.jpg",
+        "genres": ["Action", "Mecha"],
+    }
 
 
 async def test_fetch_anilist_metadata_missing_media_returns_none(monkeypatch) -> None:

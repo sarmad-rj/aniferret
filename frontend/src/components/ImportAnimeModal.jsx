@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Loader2, Search, X } from "lucide-react";
+import useBodyScrollLock from "../hooks/useBodyScrollLock";
 import { postImportAnime } from "../lib/api";
 
 function ImportSkeleton() {
@@ -21,6 +22,8 @@ function ImportAnimeModal({ onImported, onClose }) {
   const [query, setQuery] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  useBodyScrollLock();
 
   const handleSubmit = async (event) => {
     event.preventDefault();

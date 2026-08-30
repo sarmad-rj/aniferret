@@ -1,11 +1,12 @@
 import { useState } from "react";
 import CharacterDossierModal from "./CharacterDossierModal";
-import CharacterGrid from "./CharacterGrid";
 import FactionHierarchy from "./FactionHierarchy";
+import FactionMembersModal from "./FactionMembersModal";
 import ForeshadowingIndex from "./ForeshadowingIndex";
 
 function DossierView({ dossier, isRewatchMode }) {
   const [selectedCharacter, setSelectedCharacter] = useState(null);
+  const [selectedFactionGroup, setSelectedFactionGroup] = useState(null);
 
   if (!dossier) {
     return null;
@@ -15,26 +16,37 @@ function DossierView({ dossier, isRewatchMode }) {
     return <ForeshadowingIndex dossier={dossier} />;
   }
 
-  const selectedFaction = dossier.factions.find(
+  const selectedCharacterFaction = dossier.factions.find(
     (faction) => faction.id === selectedCharacter?.faction_id,
   );
+
+  const handleSelectCharacter = (character) => {
+    setSelectedFactionGroup(null);
+    setSelectedCharacter(character);
+  };
 
   return (
     <div className="flex flex-col gap-6">
       <FactionHierarchy
         factions={dossier.factions}
         characters={dossier.characters}
-        onSelectCharacter={setSelectedCharacter}
+        onSelectCharacter={handleSelectCharacter}
+        onSelectFactionGroup={setSelectedFactionGroup}
       />
-      <CharacterGrid
-        characters={dossier.characters}
-        onSelectCharacter={setSelectedCharacter}
-      />
+
+      {selectedFactionGroup && (
+        <FactionMembersModal
+          faction={selectedFactionGroup.faction}
+          members={selectedFactionGroup.members}
+          onSelectCharacter={handleSelectCharacter}
+          onClose={() => setSelectedFactionGroup(null)}
+        />
+      )}
 
       {selectedCharacter && (
         <CharacterDossierModal
           character={selectedCharacter}
-          factionName={selectedFaction?.name}
+          factionName={selectedCharacterFaction?.name}
           onClose={() => setSelectedCharacter(null)}
         />
       )}

@@ -10,14 +10,45 @@ from app.services import ingestion_service
 from app.services.ingestion_service import (
     AnimeImportError,
     ExtractedFact,
+    _clean_backstory,
     _extract_affiliation,
+    _format_display_name,
     _is_checkpoint_in_range,
     import_anime,
     resolve_mal_id,
 )
 from tests.conftest import TestSessionLocal
 
+_REAL_EXTRACT_DEBUT_EPISODE = ingestion_service.extract_debut_episode
+"""Captured before any fixture patches ingestion_service.extract_debut_episode, so the
+two tests that exercise the real function directly can restore it despite the module's
+autouse fixture mocking it by default for every other test in this file."""
+
 # --- pure helper functions ---
+
+
+def test_format_display_name_reorders_last_middle_first() -> None:
+    # AniList's structured fields for Monkey D. Luffy: first='Luffy', middle='D.',
+    # last='Monkey', full='Luffy Monkey' (Western order) — display should be canonical.
+    assert (
+        _format_display_name({"first": "Luffy", "middle": "D.", "last": "Monkey", "full": "Luffy Monkey"})
+        == "Monkey D. Luffy"
+    )
+
+
+def test_format_display_name_reorders_last_first_without_middle() -> None:
+    assert (
+        _format_display_name({"first": "Zoro", "middle": None, "last": "Roronoa", "full": "Zoro Roronoa"})
+        == "Roronoa Zoro"
+    )
+
+
+def test_format_display_name_falls_back_to_first_when_no_last_name() -> None:
+    assert _format_display_name({"first": "Nami", "middle": None, "last": "", "full": "Nami"}) == "Nami"
+
+
+def test_format_display_name_falls_back_to_full_when_structured_fields_absent() -> None:
+    assert _format_display_name({"full": "Portgas D. Ace"}) == "Portgas D. Ace"
 
 
 def test_extract_affiliation_finds_bold_line() -> None:
@@ -32,6 +63,47 @@ def test_extract_affiliation_strips_spoiler_markers() -> None:
 
 def test_extract_affiliation_returns_none_when_absent() -> None:
     assert _extract_affiliation("Just a plain bio with no structured fields.") is None
+
+
+def test_extract_affiliation_matches_plural_affiliations_variant() -> None:
+    # Real AniList data: Luffy's bio uses the plural '__Affiliations:__' line — the
+    # regex must match both spellings, not just the singular 'Affiliation:'.
+    description = "__Affiliations:__ Straw Hat Pirates (Captain); Four Emperors \nSome text"
+    assert _extract_affiliation(description) == "Straw Hat Pirates"
+
+
+def test_clean_backstory_strips_structured_header_lines() -> None:
+    description = (
+        "__Height:__ 174 cm (5'8½\")\n"
+        "__Affiliation:__ Straw Hat Pirates (previously Usopp Pirates)  \n"
+        "__Position:__ Sniper  \n"
+        "__Bounty:__  500,000,000 (previously 30,000,000)\n"
+        "\n"
+        "Usopp is a liar and likes to play pranks on his crew members."
+    )
+    backstory = _clean_backstory(description)
+
+    assert backstory == "Usopp is a liar and likes to play pranks on his crew members."
+
+
+def test_clean_backstory_preserves_multiple_prose_paragraphs() -> None:
+    description = "__Height:__ 172 cm\n\nFirst paragraph of lore.\n\nSecond paragraph of lore."
+
+    backstory = _clean_backstory(description)
+
+    assert backstory == "First paragraph of lore.\n\nSecond paragraph of lore."
+
+
+def test_clean_backstory_strips_spoiler_markers() -> None:
+    description = "A hero. ~!Secretly a clone!~"
+
+    assert _clean_backstory(description) == "A hero. Secretly a clone"
+
+
+def test_clean_backstory_returns_none_for_header_only_bio() -> None:
+    description = "__Height:__ 172 cm\n__Bounty:__ 100"
+
+    assert _clean_backstory(description) is None
 
 
 def test_is_checkpoint_in_range_accepts_none() -> None:
@@ -129,6 +201,53 @@ def test_extract_facts_returns_empty_for_blank_description(monkeypatch) -> None:
     assert ingestion_service.extract_facts_from_character("Test", "   ", 24) == []
 
 
+# --- dynamic canon debut extraction ---
+
+
+def test_extract_debut_episode_returns_none_without_api_key(monkeypatch) -> None:
+    class _FakeSettings:
+        gemini_api_key = ""
+
+    monkeypatch.setattr(ingestion_service, "get_settings", lambda: _FakeSettings())
+    monkeypatch.setattr(ingestion_service, "extract_debut_episode", _REAL_EXTRACT_DEBUT_EPISODE)
+
+    assert ingestion_service.extract_debut_episode("Test", "Some bio", 24) is None
+
+
+def test_extract_debut_episode_returns_none_for_blank_description(monkeypatch) -> None:
+    class _FakeSettings:
+        gemini_api_key = "fake-key"
+
+    monkeypatch.setattr(ingestion_service, "get_settings", lambda: _FakeSettings())
+    monkeypatch.setattr(ingestion_service, "extract_debut_episode", _REAL_EXTRACT_DEBUT_EPISODE)
+
+    assert ingestion_service.extract_debut_episode("Test", "   ", 24) is None
+
+
+def test_resolve_debut_checkpoint_uses_debut_when_no_crew_join() -> None:
+    assert ingestion_service._resolve_debut_checkpoint(3, None, 100) == "S1E3"
+
+
+def test_resolve_debut_checkpoint_uses_later_crew_join_over_debut() -> None:
+    assert ingestion_service._resolve_debut_checkpoint(5, 12, 100) == "S1E12"
+
+
+def test_resolve_debut_checkpoint_ignores_crew_join_earlier_than_debut() -> None:
+    assert ingestion_service._resolve_debut_checkpoint(12, 5, 100) == "S1E12"
+
+
+def test_resolve_debut_checkpoint_returns_none_when_both_unknown() -> None:
+    assert ingestion_service._resolve_debut_checkpoint(None, None, 100) is None
+
+
+def test_resolve_debut_checkpoint_drops_out_of_range_debut() -> None:
+    assert ingestion_service._resolve_debut_checkpoint(9999, None, 100) is None
+
+
+def test_resolve_debut_checkpoint_falls_back_to_in_range_crew_join_when_debut_out_of_range() -> None:
+    assert ingestion_service._resolve_debut_checkpoint(9999, 40, 100) == "S1E40"
+
+
 # --- import_anime orchestration (external calls mocked) ---
 
 
@@ -176,6 +295,15 @@ def _fake_extract_facts(name: str, description: str, max_episode: int) -> list[E
     ]
 
 
+def _fake_extract_debut_episode(name: str, description: str, max_episode: int) -> str:
+    """Default debut-extraction mock: every character has a confidently-known debut, so
+    tests not specifically about debut gating aren't affected by the "unknown debut ->
+    excluded entirely" behavior. Tests that exercise that behavior override this via
+    monkeypatch (see test_import_anime_skips_character_with_unknown_debut_episode etc).
+    """
+    return "S1E1"
+
+
 @pytest.fixture(autouse=True)
 def _mock_provider_calls(monkeypatch):
     """Mocks the external metadata/roster/indexing calls for every test in this file.
@@ -188,6 +316,7 @@ def _mock_provider_calls(monkeypatch):
     monkeypatch.setattr(ingestion_service, "fetch_jikan_metadata", _fake_fetch_jikan_metadata)
     monkeypatch.setattr(ingestion_service, "fetch_anilist_metadata", _fake_fetch_anilist_metadata)
     monkeypatch.setattr(ingestion_service, "fetch_character_roster", _fake_fetch_character_roster)
+    monkeypatch.setattr(ingestion_service, "extract_debut_episode", _fake_extract_debut_episode)
     monkeypatch.setattr(ingestion_service, "index_facts", lambda pairs: None)
 
 
@@ -367,9 +496,14 @@ async def test_import_anime_captures_rich_character_metadata(_mock_rich_roster) 
         assert character.backstory is not None and "Secretly royalty" in character.backstory
 
 
-async def test_import_anime_derives_first_revealed_at_from_earliest_extracted_fact(
-    _mock_rich_roster,
+async def test_import_anime_first_revealed_at_comes_from_debut_extraction_not_facts(
+    monkeypatch, _mock_rich_roster
 ) -> None:
+    """first_revealed_at is the dedicated LLM debut-extraction result, independent of
+    (and not derived from) any extracted fact's own checkpoint — the two pipelines are
+    separate. Uses a debut value distinct from every fact checkpoint to prove it."""
+    monkeypatch.setattr(ingestion_service, "extract_debut_episode", lambda *args: "S1E42")
+
     async with TestSessionLocal() as session:
         anime = await import_anime(session, "Test Anime 9")
 
@@ -378,19 +512,21 @@ async def test_import_anime_derives_first_revealed_at_from_earliest_extracted_fa
         )
         character = character_result.scalars().one()
 
-        assert character.first_revealed_at == "S1E15"
+        assert character.first_revealed_at == "S1E42"
 
 
-async def test_import_anime_defaults_first_revealed_at_when_no_facts_extracted() -> None:
+async def test_import_anime_skips_character_with_unknown_debut_episode(monkeypatch) -> None:
+    """Dynamic Canon Debut Extraction: an undeterminable debut episode means the
+    character is skipped entirely — never persisted, never defaulted to episode 1."""
+    monkeypatch.setattr(ingestion_service, "extract_debut_episode", lambda *args: None)
+
     async with TestSessionLocal() as session:
         anime = await import_anime(session, "Test Anime 10")
 
         character_result = await session.execute(
             select(Character).where(Character.anime_id == anime.id)
         )
-        character = character_result.scalars().one()
-
-        assert character.first_revealed_at == "S1E1"
+        assert character_result.scalars().all() == []
 
 
 async def test_import_anime_nests_pirate_crew_under_pirate_crews_faction(

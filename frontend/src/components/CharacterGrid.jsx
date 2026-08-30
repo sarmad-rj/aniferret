@@ -1,15 +1,21 @@
 import CharacterCard from "./CharacterCard";
 
-function CharacterGrid({ characters, onSelectCharacter }) {
+function CharacterGrid({
+  characters,
+  onSelectCharacter,
+  title = "Character Roster",
+}) {
   if (characters.length === 0) {
     return null;
   }
 
   return (
     <section>
-      <h2 className="mb-3 text-sm font-semibold text-[var(--primary)]">
-        Character Roster
-      </h2>
+      {title && (
+        <h2 className="mb-3 text-sm font-semibold text-[var(--primary)]">
+          {title}
+        </h2>
+      )}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {characters.map((character) => (
           <CharacterCard

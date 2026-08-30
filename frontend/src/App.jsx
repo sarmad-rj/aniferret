@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Users } from "lucide-react";
 import Header from "./components/Header";
 import NavBar from "./components/NavBar";
+import AnimeHero from "./components/AnimeHero";
 import ProgressSlider from "./components/ProgressSlider";
 import RewatchModeToggle from "./components/RewatchModeToggle";
 import GroupModeModal from "./components/GroupModeModal";
@@ -112,24 +113,21 @@ function App() {
           />
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-semibold text-[var(--primary)]">
-            {selectedAnime ? selectedAnime.title : "Loading..."}
-          </h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsGroupModalOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--primary)]"
-            >
-              <Users className="h-3.5 w-3.5" />
-              Group Mode
-            </button>
-            <RewatchModeToggle
-              isRewatchMode={isRewatchMode}
-              onToggle={setIsRewatchMode}
-            />
-          </div>
+        <AnimeHero anime={selectedAnime} checkpoint={activeCheckpoint} />
+
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setIsGroupModalOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--primary)]"
+          >
+            <Users className="h-3.5 w-3.5" />
+            Group Mode
+          </button>
+          <RewatchModeToggle
+            isRewatchMode={isRewatchMode}
+            onToggle={setIsRewatchMode}
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

@@ -13,6 +13,10 @@ class AnimeBase(BaseModel):
         default_factory=list,
         description="Episode count per season in order, e.g. [12, 13, 12], for building valid checkpoints",
     )
+    cover_image_url: str | None = Field(default=None, description="Poster/cover art URL")
+    genres: list[str] = Field(default_factory=list, description="Genre tags, e.g. ['Action', 'Fantasy']")
+    synopsis: str | None = Field(default=None, description="Official series-level premise blurb")
+    score: float | None = Field(default=None, description="Aggregate community rating, 0-10 scale")
 
 
 class AnimeCreate(AnimeBase):

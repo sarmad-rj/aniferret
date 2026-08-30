@@ -47,6 +47,8 @@ query ($idMal: Int) {
     episodes
     averageScore
     description(asHtml: false)
+    coverImage { large }
+    genres
   }
 }
 """
@@ -69,6 +71,8 @@ async def fetch_jikan_metadata(mal_id: int) -> dict | None:
         "episodes": data.get("episodes"),
         "score": data.get("score"),
         "synopsis": data.get("synopsis"),
+        "cover_image_url": ((data.get("images") or {}).get("jpg") or {}).get("large_image_url"),
+        "genres": [genre["name"] for genre in data.get("genres") or [] if genre.get("name")],
     }
 
 
@@ -92,6 +96,8 @@ async def fetch_anilist_metadata(mal_id: int) -> dict | None:
         "episodes": media.get("episodes"),
         "score": (average_score / 10) if average_score is not None else None,
         "synopsis": media.get("description"),
+        "cover_image_url": (media.get("coverImage") or {}).get("large"),
+        "genres": media.get("genres") or [],
     }
 
 
@@ -192,7 +198,7 @@ query ($idMal: Int, $perPage: Int) {
       edges {
         role
         node {
-          name { full }
+          name { full first middle last }
           description(asHtml: false)
           image { large }
         }
@@ -211,9 +217,10 @@ _MAX_CHARACTERS_TO_INGEST = 8
 
 _EXTRACTION_MODEL_NAME = "gemini-3.6-flash"
 
-_AFFILIATION_RE = re.compile(r"Affiliation:[*_]*\s*([^\n\r(]+)", re.IGNORECASE)
-"""Matches AniList's markdown convention, e.g. '__Affiliation:__ Straw Hat Pirates (...)' —
-[*_]* eats the closing bold marker, whether it's asterisks or (AniList's actual style) underscores."""
+_AFFILIATION_RE = re.compile(r"Affiliations?:[*_]*\s*([^\n\r(]+)", re.IGNORECASE)
+"""Matches AniList's markdown convention, e.g. '__Affiliation:__ Straw Hat Pirates (...)' or
+the plural '__Affiliations:__ ...' variant some bios use (e.g. Luffy's) — [*_]* eats the
+closing bold marker, whether it's asterisks or (AniList's actual style) underscores."""
 
 _BOUNTY_RE = re.compile(r"Bount(?:y|ies):[*_]*\s*([^\n\r(]+)", re.IGNORECASE)
 _POWER_RE = re.compile(r"(?:Devil Fruit|Power|Ability|Haki):[*_]*\s*([^\n\r(]+)", re.IGNORECASE)
@@ -234,6 +241,12 @@ _EXTRACTION_SYSTEM_INSTRUCTION = (
     "genuinely spoiler-relevant, not trivia), and faction (the name of a team, squad, "
     "crew, division, guild, or organization the character clearly belongs to, if the bio "
     "states one — else null; do not guess or infer one that isn't explicitly stated).\n\n"
+    "If the bio's Bounty line lists a history of prior values (e.g. 'X (previously Y, "
+    "Z)'), extract each distinct bounty value as its own fact with predicate 'bounty' and "
+    "object set to just the numeric amount (no commentary) — first_revealed_at should be "
+    "the checkpoint at which that amount became their bounty, increasing over the series "
+    "(earlier amounts get earlier checkpoints, the current amount the latest/highest "
+    "checkpoint you can justify). Skip this if the bio gives no such history.\n\n"
     "The bio text may contain spoiler markers: content between ~! and !~ is community-"
     "flagged as a spoiler by the source. Facts drawn from inside those markers must get a "
     "first_revealed_at well into the series (a high episode number, not episode 1) — "
@@ -268,6 +281,26 @@ async def resolve_mal_id(query: str) -> int | None:
     return media.get("idMal") if media else None
 
 
+def _format_display_name(name_node: dict) -> str:
+    """Reorder AniList's structured name into the family-name-first convention these
+    titles are commonly known by, dynamically, per character.
+
+    AniList's `full` field is always given-name-first (Western order) even for
+    Japanese-origin characters — e.g. for Luffy it reports first='Luffy', middle='D.',
+    last='Monkey', full='Luffy Monkey' — so displaying `full` verbatim produces reversed
+    names like 'Luffy Monkey' or 'Zoro Roronoa' instead of 'Monkey D. Luffy' / 'Roronoa
+    Zoro'. Rebuilding as last + middle + first (falling back to `first`/`full` when no
+    last name is on file, e.g. 'Nami') fixes this from AniList's own structured fields —
+    no per-character name table involved.
+    """
+    first = (name_node.get("first") or "").strip()
+    middle = (name_node.get("middle") or "").strip()
+    last = (name_node.get("last") or "").strip()
+    if last:
+        return " ".join(part for part in (last, middle, first) if part)
+    return first or (name_node.get("full") or "").strip()
+
+
 async def fetch_character_roster(mal_id: int, limit: int = _MAX_CHARACTERS_TO_INGEST) -> list[dict]:
     """Fetch up to `limit` characters (main cast first) with their bio text, via AniList.
 
@@ -297,7 +330,7 @@ async def fetch_character_roster(mal_id: int, limit: int = _MAX_CHARACTERS_TO_IN
     roster = []
     for edge in edges:
         node = edge.get("node") or {}
-        name = (node.get("name") or {}).get("full")
+        name = _format_display_name(node.get("name") or {})
         if name:
             roster.append(
                 {
@@ -327,6 +360,25 @@ def _extract_bio_field(description: str, pattern: re.Pattern[str]) -> str | None
 def _extract_affiliation(description: str) -> str | None:
     """Pull a character's group/organization from AniList's 'Affiliation:' bio convention."""
     return _extract_bio_field(description, _AFFILIATION_RE)
+
+
+_STRUCTURED_BIO_LINE_RE = re.compile(r"^[*_]{2}[^*_\n:]+:[*_]{2}.*$", re.MULTILINE)
+"""Matches a whole AniList structured bio line, e.g. '__Height:__ 174 cm' or
+'__Bounty:__ 500,000,000 (...)' — covers every such line generically (Height,
+Affiliation, Bounty, Devil Fruit, Position, etc.), not just the specific fields parsed
+into their own dossier columns above."""
+
+
+def _clean_backstory(description: str) -> str | None:
+    """Strip AniList's structured '__Label:__ value' header lines out of a bio, leaving
+    only the prose narrative — those fields are already surfaced as their own dossier
+    stats (height/bounty/power/affiliation), so repeating them inside the backstory text
+    is redundant clutter rather than a spoiler concern.
+    """
+    spoiler_markers_removed = description.replace("~!", "").replace("!~", "")
+    without_headers = _STRUCTURED_BIO_LINE_RE.sub("", spoiler_markers_removed)
+    paragraphs = [line.strip() for line in without_headers.split("\n") if line.strip()]
+    return "\n\n".join(paragraphs) or None
 
 
 def _is_checkpoint_in_range(checkpoint: str | None, season_episode_counts: list[int]) -> bool:
@@ -385,6 +437,103 @@ def extract_facts_from_character(
     return validated
 
 
+# ---------------------------------------------------------------------------
+# Dynamic canon debut extraction: a character's first appearance / crew-join
+# episode, determined by the LLM from its own knowledge + bio text. There is no
+# hardcoded episode map and no fallback to episode 1 — an undetermined debut means
+# the character is skipped entirely (see _ingest_character), never silently shown.
+# ---------------------------------------------------------------------------
+
+
+class DebutInfo(BaseModel):
+    """Gemini's structured-output shape for one character's canon debut timing."""
+
+    debut_episode: int | None = Field(
+        default=None,
+        description=(
+            "The episode number (1-indexed) of this character's canonical first "
+            "appearance in the anime. Null if genuinely not determinable with "
+            "reasonable confidence — never guess."
+        ),
+    )
+    crew_join_episode: int | None = Field(
+        default=None,
+        description=(
+            "The episode number this character officially joins their stated crew/"
+            "faction, only if that's known and later than their debut; else null."
+        ),
+    )
+
+
+_DEBUT_EXTRACTION_SYSTEM_INSTRUCTION = (
+    "You are AniFerret's canon debut extraction engine. Given a character's name and "
+    "public bio/wiki description from an anime with {max_episode} total episodes, use "
+    "your own knowledge of the source material together with the bio text to determine: "
+    "debut_episode (the episode number of this character's canonical first on-screen "
+    "appearance) and crew_join_episode (the episode they officially join their stated "
+    "crew/faction, only if that is known and later than their debut). Both must be "
+    "integers between 1 and {max_episode} inclusive when known. If you cannot determine "
+    "the debut episode with reasonable confidence, return null for debut_episode — never "
+    "default to episode 1 and never guess."
+)
+
+
+def _resolve_debut_checkpoint(
+    debut_episode: int | None, crew_join_episode: int | None, max_episode: int
+) -> str | None:
+    """Combine debut + crew-join episodes into the single checkpoint at which a
+    character is safe to show as an introduced member of their faction: the later of
+    the two, restricted to in-range values. None (unknown/undeterminable) if neither
+    candidate is a valid in-range episode number.
+    """
+    candidates = [
+        episode
+        for episode in (debut_episode, crew_join_episode)
+        if episode is not None and 1 <= episode <= max_episode
+    ]
+    if not candidates:
+        return None
+    return f"S1E{max(candidates)}"
+
+
+def extract_debut_episode(character_name: str, description: str, max_episode: int) -> str | None:
+    """Ask Gemini for a character's canon debut checkpoint via the LLM extraction
+    pipeline — the sole source of truth for when a character is introduced.
+
+    Returns None on a missing API key, any failure (network, quota, malformed
+    response), or when the model itself reports no confident debut episode. Callers
+    must treat None as "exclude this character entirely", never default to episode 1.
+    """
+    settings = get_settings()
+    if not settings.gemini_api_key or not description.strip():
+        return None
+
+    try:
+        client = genai.Client(api_key=settings.gemini_api_key)
+        response = client.models.generate_content(
+            model=_EXTRACTION_MODEL_NAME,
+            contents=f"Character: {character_name}\n\nBio:\n{description[:4000]}",
+            config=types.GenerateContentConfig(
+                system_instruction=_DEBUT_EXTRACTION_SYSTEM_INSTRUCTION.format(max_episode=max_episode),
+                response_mime_type="application/json",
+                response_schema=DebutInfo,
+            ),
+        )
+        parsed = response.parsed
+    except Exception:
+        logger.warning("Gemini debut extraction failed for %r", character_name, exc_info=True)
+        return None
+
+    if parsed is None:
+        return None
+    try:
+        info = parsed if isinstance(parsed, DebutInfo) else DebutInfo.model_validate(parsed)
+    except ValidationError:
+        return None
+
+    return _resolve_debut_checkpoint(info.debut_episode, info.crew_join_episode, max_episode)
+
+
 async def _generate_unique_slug(session: AsyncSession, title: str, mal_id: int) -> str:
     base = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-") or f"anime-{mal_id}"
     candidate = base
@@ -441,13 +590,28 @@ async def _ingest_character(
     max_episode: int,
     season_episode_counts: list[int],
     faction_cache: _FactionCache,
-) -> tuple[Character, list[tuple[TemporalFact, str]]]:
+) -> tuple[Character, list[tuple[TemporalFact, str]]] | None:
     """Extract facts + rich dossier metadata for one roster entry, persist the Character
-    (with faction/crew classification and a dynamically derived first_revealed_at), and
-    return it alongside the (fact, anime_slug) pairs still pending vector indexing.
+    (with faction/crew classification and a dynamically extracted canon debut
+    checkpoint), and return it alongside the (fact, anime_slug) pairs still pending
+    vector indexing.
+
+    Returns None — the caller must skip this character entirely — when
+    extract_debut_episode can't determine a confident canon debut checkpoint. There is
+    no hardcoded episode map and no fallback to episode 1: an unknown debut means the
+    character never enters Factions or the UI roster, at any checkpoint.
     """
     name = character_data["name"]
     description = character_data["description"]
+
+    first_revealed_at = extract_debut_episode(name, description, max_episode)
+    if first_revealed_at is None:
+        logger.info(
+            "Skipping %r: no confidently-determined canon debut episode from the "
+            "dynamic extraction pipeline (never defaulting to episode 1).",
+            name,
+        )
+        return None
 
     extracted_facts = extract_facts_from_character(name, description, max_episode)
 
@@ -474,16 +638,6 @@ async def _ingest_character(
             fact_data.first_hinted_at = None  # optional field — drop just the hint, not the fact
         valid_facts.append(fact_data)
 
-    # A character's own dossier fields (bounty, power, backstory) unlock at whichever
-    # checkpoint is earliest among their own extracted facts — the introduction-arc
-    # signal Gemini already derived from the bio's spoiler markers — falling back to the
-    # very first episode when nothing was extracted for them at all.
-    first_revealed_at = min(
-        (fact_data.first_revealed_at for fact_data in valid_facts), key=parse_checkpoint, default="S1E1"
-    )
-
-    stripped_description = description.replace("~!", "").replace("!~", "").strip()
-
     character = Character(
         anime_id=anime.id,
         name=name,
@@ -493,7 +647,7 @@ async def _ingest_character(
         height=_extract_bio_field(description, _HEIGHT_RE),
         bounty=_extract_bio_field(description, _BOUNTY_RE),
         power=_extract_bio_field(description, _POWER_RE),
-        backstory=stripped_description or None,
+        backstory=_clean_backstory(description),
         first_revealed_at=first_revealed_at,
     )
     session.add(character)
@@ -532,9 +686,12 @@ async def ingest_character_roster(
     indexed_pairs: list[tuple[TemporalFact, str]] = []
 
     for character_data in roster:
-        _character, fact_pairs = await _ingest_character(
+        result = await _ingest_character(
             session, anime, character_data, anime.total_episodes, season_episode_counts, faction_cache
         )
+        if result is None:
+            continue
+        _character, fact_pairs = result
         indexed_pairs.extend(fact_pairs)
 
     await session.commit()
@@ -587,6 +744,11 @@ async def import_anime(session: AsyncSession, query: str) -> Anime:
         season_episode_counts=season_episode_counts,
         mal_id=mal_id,
         anilist_id=mal_id,
+        cover_image_url=(jikan_data or {}).get("cover_image_url")
+        or (anilist_data or {}).get("cover_image_url"),
+        genres=(jikan_data or {}).get("genres") or (anilist_data or {}).get("genres") or [],
+        synopsis=metadata.get("synopsis"),
+        score=(jikan_data or {}).get("score") or (anilist_data or {}).get("score"),
     )
     session.add(anime)
     await session.flush()

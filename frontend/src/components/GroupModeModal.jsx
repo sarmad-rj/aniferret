@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, Trash2, Users, X } from "lucide-react";
+import useBodyScrollLock from "../hooks/useBodyScrollLock";
 import { postGroupSessionEvaluate } from "../lib/api";
 import { formatCheckpointLabel } from "../lib/checkpoint";
 
@@ -10,6 +11,8 @@ function GroupModeModal({ checkpointSequence, onApply, onClose }) {
   ]);
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useBodyScrollLock();
 
   const handleWatcherChange = (index, value) => {
     setWatcherCheckpoints((previous) =>

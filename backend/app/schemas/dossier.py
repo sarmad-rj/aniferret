@@ -26,18 +26,16 @@ class CharacterDossierEntry(BaseModel):
     height: str | None = None
     avatar_url: str | None = None
     is_revealed: bool = Field(
-        ..., description="Whether first_revealed_at <= the dossier's checkpoint"
+        default=True,
+        description=(
+            "Always true: characters not yet introduced (first_revealed_at > checkpoint) "
+            "are omitted from the dossier entirely rather than included masked."
+        ),
     )
     first_revealed_at: str
-    bounty: str | None = Field(
-        default=None, description="Null (masked) until is_revealed is true"
-    )
-    power: str | None = Field(
-        default=None, description="Null (masked) until is_revealed is true"
-    )
-    backstory: str | None = Field(
-        default=None, description="Null (masked) until is_revealed is true"
-    )
+    bounty: str | None = None
+    power: str | None = Field(default=None, description="Devil Fruit / special ability")
+    backstory: str | None = None
     revealed_facts: list[RevealedFact] = Field(default_factory=list)
 
 
