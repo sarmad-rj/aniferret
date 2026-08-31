@@ -62,7 +62,7 @@ function LoreAssistant({ animeSlug, checkpoint }) {
   };
 
   return (
-    <section className="flex h-[28rem] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+    <section className="flex h-[calc(100vh-12rem)] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)]">
       <header className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-3">
         <Sparkles className="h-4 w-4 text-[var(--ferret)]" />
         <h2 className="text-sm font-semibold text-[var(--primary)]">

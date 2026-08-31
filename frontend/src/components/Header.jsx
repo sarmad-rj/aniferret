@@ -1,4 +1,5 @@
 import { Plus } from "lucide-react";
+import { Link } from "react-router-dom";
 import logo from "../logo/AniFerret_Logo.png";
 
 function Header({ animeList, selectedSlug, onSelectAnime, onOpenImport }) {
@@ -8,7 +9,7 @@ function Header({ animeList, selectedSlug, onSelectAnime, onOpenImport }) {
 
   return (
     <header className="flex flex-wrap items-center justify-between gap-3 bg-[var(--primary)] px-4 py-3 sm:px-6">
-      <div className="flex items-center gap-2">
+      <Link to="/" className="flex items-center gap-2">
         <img
           src={logo}
           alt="AniFerret logo"
@@ -17,7 +18,7 @@ function Header({ animeList, selectedSlug, onSelectAnime, onOpenImport }) {
         <span className="text-xl font-bold text-[var(--surface)]">
           AniFerret
         </span>
-      </div>
+      </Link>
 
       <div className="flex items-center gap-2">
         {animeList.length > 0 && (

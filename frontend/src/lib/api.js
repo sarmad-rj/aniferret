@@ -50,3 +50,7 @@ export function postImportAnime(query) {
     body: JSON.stringify({ query }),
   });
 }
+
+export function fetchWatchOrder(franchiseSlug) {
+  return request(`/franchises/${franchiseSlug}/watch-order`);
+}

@@ -2,6 +2,16 @@ from app.models.anime import Anime
 from app.models.anime_external_metadata import AnimeExternalMetadata
 from app.models.character import Character
 from app.models.faction import Faction
+from app.models.franchise import Franchise
+from app.models.franchise_entry import FranchiseEntry
 from app.models.temporal_fact import TemporalFact
 
-__all__ = ["Anime", "AnimeExternalMetadata", "Character", "Faction", "TemporalFact"]
+__all__ = [
+    "Anime",
+    "AnimeExternalMetadata",
+    "Character",
+    "Faction",
+    "Franchise",
+    "FranchiseEntry",
+    "TemporalFact",
+]

@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 from app import models  # noqa: F401  (registers all ORM models on Base's mapper registry)
 from app.core.database import Base, get_db
 from app.main import app
-from app.models import Anime, Character, Faction, TemporalFact
+from app.models import Anime, Character, Faction, Franchise, FranchiseEntry, TemporalFact
 from app.services import ingestion_service, llm_synthesizer
 
 test_engine = create_async_engine(
@@ -39,6 +39,22 @@ async def _seed_fixture_data() -> None:
 
         faction = Faction(anime_id=anime.id, name="Black Knights", description="Resistance force.")
         session.add(faction)
+        session.add(
+            Faction(
+                anime_id=anime.id,
+                name="Holy Britannian Empire",
+                description="The ruling imperial power.",
+                first_revealed_at="S1E1",
+            )
+        )
+        session.add(
+            Faction(
+                anime_id=anime.id,
+                name="Chinese Federation",
+                description="A rival superpower revealed later in the story.",
+                first_revealed_at="S1E20",
+            )
+        )
         await session.flush()
 
         session.add(
@@ -79,6 +95,32 @@ async def _seed_fixture_data() -> None:
                     first_revealed_at="S1E12",
                     first_hinted_at="S1E3",
                     confidence=0.97,
+                ),
+            ]
+        )
+
+        franchise = Franchise(slug="code-geass", name="Code Geass")
+        session.add(franchise)
+        await session.flush()
+
+        session.add_all(
+            [
+                FranchiseEntry(
+                    franchise_id=franchise.id,
+                    anime_id=anime.id,
+                    title="Code Geass: Lelouch of the Rebellion",
+                    entry_type="tv",
+                    release_order=1,
+                    chronological_order=2,
+                ),
+                FranchiseEntry(
+                    franchise_id=franchise.id,
+                    anime_id=None,
+                    title="Code Geass: Akito the Exiled (OVA)",
+                    entry_type="ova",
+                    release_order=2,
+                    chronological_order=1,
+                    note="A side-story OVA set chronologically before the TV series' Second Season.",
                 ),
             ]
         )

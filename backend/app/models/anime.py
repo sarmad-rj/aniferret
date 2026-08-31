@@ -39,3 +39,4 @@ class Anime(TimestampMixin, Base):
     external_metadata: Mapped[list["AnimeExternalMetadata"]] = relationship(
         back_populates="anime", cascade="all, delete-orphan"
     )
+    franchise_entries: Mapped[list["FranchiseEntry"]] = relationship(back_populates="anime")

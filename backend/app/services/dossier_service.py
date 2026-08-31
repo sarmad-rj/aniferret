@@ -40,13 +40,21 @@ def _prune_empty_factions(
     factions: list[Faction],
     characters: list[CharacterDossierEntry],
     facts_by_subject: dict[str, list[RevealedFact]],
+    checkpoint: str,
 ) -> list[FactionDossierEntry]:
-    """Drop any faction/crew with zero currently-introduced members from the response.
+    """Drop any faction/crew not yet visible at this checkpoint from the response.
 
-    A top-level faction survives if it has direct members itself OR at least one of its
-    nested crews does — so a card like "Pirate Crews" never renders with an empty
-    "Straw Hat Pirates" sub-section (or, before anyone in that faction has debuted, at
-    all) before the introduction arc for its first member.
+    A faction is visible once it has at least one currently-introduced member, OR (for a
+    top-level faction) once one of its nested crews is visible, OR once its own
+    `first_revealed_at` checkpoint has been reached. That third path exists for
+    *structural* factions whose existence is public setting lore independent of any one
+    member's debut — e.g. Classroom of the Elite's four class ranks are explained in
+    Episode 1 even before a named rival-class character has appeared — so those cards
+    can render as an empty container ("No known members introduced yet") rather than
+    disappearing entirely. A faction with no `first_revealed_at` set keeps the legacy,
+    member-only behavior: a card like "Pirate Crews" never renders with an empty "Straw
+    Hat Pirates" sub-section (or at all) before the introduction arc for its first
+    member, since that grouping itself is a narrative reveal, not day-one lore.
     """
     member_counts: dict[int, int] = {}
     for character in characters:
@@ -56,6 +64,11 @@ def _prune_empty_factions(
     def has_direct_members(faction_id: int) -> bool:
         return member_counts.get(faction_id, 0) > 0
 
+    def structurally_revealed(faction: Faction) -> bool:
+        return faction.first_revealed_at is not None and is_revealed(
+            faction.first_revealed_at, checkpoint
+        )
+
     children_by_parent: dict[int, list[Faction]] = {}
     for faction in factions:
         if faction.parent_id is not None:
@@ -64,7 +77,8 @@ def _prune_empty_factions(
     surviving_ids: set[int] = {
         faction.id
         for faction in factions
-        if faction.parent_id is not None and has_direct_members(faction.id)
+        if faction.parent_id is not None
+        and (has_direct_members(faction.id) or structurally_revealed(faction))
     }
     surviving_ids |= {
         faction.id
@@ -72,6 +86,7 @@ def _prune_empty_factions(
         if faction.parent_id is None
         and (
             has_direct_members(faction.id)
+            or structurally_revealed(faction)
             or any(child.id in surviving_ids for child in children_by_parent.get(faction.id, []))
         )
     }
@@ -159,7 +174,7 @@ async def build_dossier(db: AsyncSession, slug: str, checkpoint: str) -> Dossier
                 revealed_facts=character_facts,
             )
         )
-    factions = _prune_empty_factions(anime.factions, characters, facts_by_subject)
+    factions = _prune_empty_factions(anime.factions, characters, facts_by_subject, checkpoint)
 
     return DossierResponse(
         anime_id=anime.id,

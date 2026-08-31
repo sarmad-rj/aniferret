@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.models import Anime, Character, Faction, TemporalFact
+from app.models import Anime, Character, Faction, Franchise, FranchiseEntry, TemporalFact
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ SEED_ANIME: list[dict] = [
         "season_episode_counts": [12, 13, 12],
         "mal_id": 35507,
         "anilist_id": 98659,
-        "cover_image_url": "https://cdn.myanimelist.net/images/anime/5/86830l.jpg",
+        "cover_image_url": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx98659-WNyPLIZDpGGY.jpg",
         "genres": ["Drama", "Suspense"],
         "score": 7.82,
         "synopsis": (
@@ -34,10 +34,31 @@ SEED_ANIME: list[dict] = [
             "than it appears, an outwardly average transfer student is placed in the "
             "lowest-ranked class — and turns out to be anything but ordinary."
         ),
+        # The school's four-class ranking (D lowest, A highest) is explained to the
+        # audience in Episode 1 via the point system — it's public setting lore, not a
+        # narrative reveal — so all four classes are given a `first_revealed_at` of
+        # S1E1 and render as visible faction cards immediately, filling in with named
+        # rival-class students as each of them individually debuts.
         "factions": [
             {
                 "name": "Class D",
                 "description": "The lowest-ranked class at the Advanced Nurturing High School.",
+                "first_revealed_at": "S1E1",
+            },
+            {
+                "name": "Class C",
+                "description": "The third-ranked class at the Advanced Nurturing High School.",
+                "first_revealed_at": "S1E1",
+            },
+            {
+                "name": "Class B",
+                "description": "The second-ranked class at the Advanced Nurturing High School.",
+                "first_revealed_at": "S1E1",
+            },
+            {
+                "name": "Class A",
+                "description": "The top-ranked class at the Advanced Nurturing High School.",
+                "first_revealed_at": "S1E1",
             },
         ],
         "characters": [
@@ -78,6 +99,53 @@ SEED_ANIME: list[dict] = [
                     "considered Class D's idol. She makes a point of trying to "
                     "befriend everyone, not just her own classmates, and gets along "
                     "particularly well with Horikita."
+                ),
+            },
+            {
+                "name": "Kakeru Ryuen",
+                "faction": "Class C",
+                "role": "Class C Leader",
+                "first_revealed_at": "S1E4",
+                "backstory": (
+                    "A physically imposing, openly aggressive leader who controls his "
+                    "classmates through intimidation and treats every inter-class "
+                    "exam as a fight to be won by any means necessary."
+                ),
+            },
+            {
+                "name": "Honami Ichinose",
+                "faction": "Class B",
+                "role": "Class B Representative",
+                "first_revealed_at": "S1E4",
+                "backstory": (
+                    "A warm, well-liked student widely seen as the ideal class "
+                    "representative, known for keeping Class B cooperative and "
+                    "friendly even under exam pressure."
+                ),
+            },
+            {
+                "name": "Kohei Katsuragi",
+                "faction": "Class A",
+                "role": "Class A Leader",
+                "first_revealed_at": "S1E4",
+                "backstory": (
+                    "A serious, methodical strategist who leads Class A with strict "
+                    "discipline, treating every special exam as a calculation to be "
+                    "solved rather than a game to be enjoyed."
+                ),
+            },
+        ],
+        "franchise_entries": [
+            {
+                "title": "Classroom of the Elite",
+                "entry_type": "tv",
+                "release_order": 1,
+                "chronological_order": 1,
+                "note": (
+                    "No movies or OVAs exist for this series. Seasons 4 and 5 have "
+                    "since been announced/aired in real life but aren't in "
+                    "AniFerret's tracked dossier yet — this watch order only covers "
+                    "the 3 seasons currently seeded."
                 ),
             },
         ],
@@ -185,6 +253,45 @@ SEED_ANIME: list[dict] = [
                     "power of Geass and is sought after by the Britannian military "
                     "for reasons of her own."
                 ),
+            },
+        ],
+        "franchise_entries": [
+            {
+                "title": "Code Geass: Lelouch of the Rebellion",
+                "entry_type": "tv",
+                "release_order": 1,
+                "chronological_order": 1,
+            },
+            {
+                "title": (
+                    "Code Geass: Lelouch of the Rebellion — Initiation / "
+                    "Transgression / Glorification"
+                ),
+                "entry_type": "movie",
+                "release_order": 2,
+                "chronological_order": 2,
+                "note": (
+                    "A compressed theatrical retelling of the TV series with a "
+                    "changed, alternate ending — required viewing before "
+                    "Re;surrection, not just a recap."
+                ),
+            },
+            {
+                "title": "Code Geass: Lelouch of the Re;surrection",
+                "entry_type": "movie",
+                "release_order": 3,
+                "chronological_order": 3,
+                "note": (
+                    "Continues from the compilation movie trilogy's alternate "
+                    "ending, not the original TV series finale."
+                ),
+            },
+            {
+                "title": "Code Geass: Rozé of the Recapture",
+                "entry_type": "movie",
+                "release_order": 4,
+                "chronological_order": 4,
+                "note": "Direct sequel to Re;surrection.",
             },
         ],
         "facts": [
@@ -335,6 +442,36 @@ SEED_ANIME: list[dict] = [
                     "strategist willing to make difficult sacrifices in pursuit of "
                     "humanity's freedom."
                 ),
+            },
+        ],
+        "franchise_entries": [
+            {
+                "title": "Attack on Titan",
+                "entry_type": "tv",
+                "release_order": 1,
+                "chronological_order": 2,
+                "note": "Our tracked dossier covers Season 1.",
+            },
+            {
+                "title": "Attack on Titan: No Regrets (OVA)",
+                "entry_type": "ova",
+                "release_order": 2,
+                "chronological_order": 1,
+                "note": (
+                    "Levi's backstory — set chronologically before the main story, "
+                    "but watch it after Season 1 to avoid spoilers about characters "
+                    "and world details it assumes you already know."
+                ),
+            },
+            {
+                "title": (
+                    "Attack on Titan: Crimson Bow and Arrow / Wings of Freedom "
+                    "(compilation movies)"
+                ),
+                "entry_type": "movie",
+                "release_order": 3,
+                "chronological_order": 3,
+                "note": "Recap compilations of Season 1 with no new content — safe to skip.",
             },
         ],
         "facts": [
@@ -606,6 +743,120 @@ SEED_ANIME: list[dict] = [
                 "first_revealed_at": "S1E91",
             },
         ],
+        "franchise_entries": [
+            {
+                "title": "One Piece",
+                "entry_type": "tv",
+                "release_order": 1,
+                "chronological_order": 1,
+                "note": (
+                    "All 15 theatrical One Piece movies below are explicitly "
+                    "non-canon side stories, confirmed by Oda himself — safe to "
+                    "skip entirely. None of them affect the main story."
+                ),
+            },
+            {
+                "title": "One Piece: The Movie (2000)",
+                "entry_type": "movie",
+                "release_order": 2,
+                "chronological_order": 2,
+            },
+            {
+                "title": "One Piece: Clockwork Island Adventure (2001)",
+                "entry_type": "movie",
+                "release_order": 3,
+                "chronological_order": 3,
+            },
+            {
+                "title": (
+                    "One Piece: Chopper's Kingdom on the Island of Strange "
+                    "Animals (2002)"
+                ),
+                "entry_type": "movie",
+                "release_order": 4,
+                "chronological_order": 4,
+            },
+            {
+                "title": "One Piece: Dead End Adventure (2003)",
+                "entry_type": "movie",
+                "release_order": 5,
+                "chronological_order": 5,
+            },
+            {
+                "title": "One Piece: The Cursed Holy Sword (2004)",
+                "entry_type": "movie",
+                "release_order": 6,
+                "chronological_order": 6,
+            },
+            {
+                "title": "One Piece: Baron Omatsuri and the Secret Island (2005)",
+                "entry_type": "movie",
+                "release_order": 7,
+                "chronological_order": 7,
+            },
+            {
+                "title": (
+                    "One Piece: The Giant Mechanical Soldier of Karakuri Castle (2006)"
+                ),
+                "entry_type": "movie",
+                "release_order": 8,
+                "chronological_order": 8,
+            },
+            {
+                "title": (
+                    "One Piece — Episode of Arabasta: The Desert Princess and "
+                    "the Pirates (2007)"
+                ),
+                "entry_type": "movie",
+                "release_order": 9,
+                "chronological_order": 9,
+            },
+            {
+                "title": (
+                    "One Piece — Episode of Chopper Plus: Bloom in Winter, "
+                    "Miracle Sakura (2008)"
+                ),
+                "entry_type": "movie",
+                "release_order": 10,
+                "chronological_order": 10,
+            },
+            {
+                "title": "One Piece Film: Strong World (2009)",
+                "entry_type": "movie",
+                "release_order": 11,
+                "chronological_order": 11,
+            },
+            {
+                "title": "One Piece 3D: Straw Hat Chase (2011)",
+                "entry_type": "movie",
+                "release_order": 12,
+                "chronological_order": 12,
+            },
+            {
+                "title": "One Piece Film: Z (2012)",
+                "entry_type": "movie",
+                "release_order": 13,
+                "chronological_order": 13,
+            },
+            {
+                "title": "One Piece Film: Gold (2016)",
+                "entry_type": "movie",
+                "release_order": 14,
+                "chronological_order": 14,
+            },
+            {
+                "title": "One Piece: Stampede (2019)",
+                "entry_type": "movie",
+                "release_order": 15,
+                "chronological_order": 15,
+            },
+            {
+                "title": "One Piece Film: Red (2022)",
+                "entry_type": "movie",
+                "release_order": 16,
+                "chronological_order": 16,
+            },
+        ],
         "facts": [
             {
                 "subject": "Monkey D. Luffy",
@@ -751,58 +1002,83 @@ SEED_ANIME: list[dict] = [
 
 
 async def seed_all(session: AsyncSession) -> None:
-    """Idempotently insert the launch corpus. Skips any anime whose slug already exists."""
+    """Idempotently insert the launch corpus. Skips any anime (or franchise) whose slug
+    already exists — checked independently, since a franchise can still need seeding
+    even when its anime was already inserted by an earlier run."""
     for anime_data in SEED_ANIME:
         existing = await session.execute(select(Anime).where(Anime.slug == anime_data["slug"]))
-        if existing.scalar_one_or_none() is not None:
-            continue
+        anime = existing.scalar_one_or_none()
 
-        anime = Anime(
-            slug=anime_data["slug"],
-            title=anime_data["title"],
-            total_episodes=anime_data["total_episodes"],
-            season_episode_counts=anime_data["season_episode_counts"],
-            mal_id=anime_data.get("mal_id"),
-            anilist_id=anime_data.get("anilist_id"),
-            cover_image_url=anime_data.get("cover_image_url"),
-            genres=anime_data.get("genres", []),
-            synopsis=anime_data.get("synopsis"),
-            score=anime_data.get("score"),
-        )
-        session.add(anime)
-        await session.flush()
-
-        faction_by_name: dict[str, Faction] = {}
-        for faction_data in anime_data.get("factions", []):
-            parent = faction_by_name.get(faction_data.get("parent"))
-            faction = Faction(
-                anime_id=anime.id,
-                name=faction_data["name"],
-                description=faction_data.get("description"),
-                parent_id=parent.id if parent else None,
+        if anime is None:
+            anime = Anime(
+                slug=anime_data["slug"],
+                title=anime_data["title"],
+                total_episodes=anime_data["total_episodes"],
+                season_episode_counts=anime_data["season_episode_counts"],
+                mal_id=anime_data.get("mal_id"),
+                anilist_id=anime_data.get("anilist_id"),
+                cover_image_url=anime_data.get("cover_image_url"),
+                genres=anime_data.get("genres", []),
+                synopsis=anime_data.get("synopsis"),
+                score=anime_data.get("score"),
             )
-            session.add(faction)
+            session.add(anime)
             await session.flush()
-            faction_by_name[faction_data["name"]] = faction
 
-        for character_data in anime_data.get("characters", []):
-            faction = faction_by_name.get(character_data.get("faction"))
-            character_kwargs = {
-                "anime_id": anime.id,
-                "name": character_data["name"],
-                "faction_id": faction.id if faction else None,
-                "role": character_data.get("role"),
-                "height": character_data.get("height"),
-                "avatar_url": character_data.get("avatar_url"),
-                "power": character_data.get("power"),
-                "backstory": character_data.get("backstory"),
-            }
-            if "first_revealed_at" in character_data:
-                character_kwargs["first_revealed_at"] = character_data["first_revealed_at"]
-            session.add(Character(**character_kwargs))
+            faction_by_name: dict[str, Faction] = {}
+            for faction_data in anime_data.get("factions", []):
+                parent = faction_by_name.get(faction_data.get("parent"))
+                faction = Faction(
+                    anime_id=anime.id,
+                    name=faction_data["name"],
+                    description=faction_data.get("description"),
+                    parent_id=parent.id if parent else None,
+                    first_revealed_at=faction_data.get("first_revealed_at"),
+                )
+                session.add(faction)
+                await session.flush()
+                faction_by_name[faction_data["name"]] = faction
 
-        for fact_data in anime_data["facts"]:
-            session.add(TemporalFact(anime_id=anime.id, **fact_data))
+            for character_data in anime_data.get("characters", []):
+                faction = faction_by_name.get(character_data.get("faction"))
+                character_kwargs = {
+                    "anime_id": anime.id,
+                    "name": character_data["name"],
+                    "faction_id": faction.id if faction else None,
+                    "role": character_data.get("role"),
+                    "height": character_data.get("height"),
+                    "avatar_url": character_data.get("avatar_url"),
+                    "power": character_data.get("power"),
+                    "backstory": character_data.get("backstory"),
+                }
+                if "first_revealed_at" in character_data:
+                    character_kwargs["first_revealed_at"] = character_data["first_revealed_at"]
+                session.add(Character(**character_kwargs))
+
+            for fact_data in anime_data["facts"]:
+                session.add(TemporalFact(anime_id=anime.id, **fact_data))
+
+        if anime_data.get("franchise_entries"):
+            existing_franchise = await session.execute(
+                select(Franchise).where(Franchise.slug == anime.slug)
+            )
+            if existing_franchise.scalar_one_or_none() is None:
+                franchise = Franchise(slug=anime.slug, name=anime_data["title"])
+                session.add(franchise)
+                await session.flush()
+
+                for entry_data in anime_data["franchise_entries"]:
+                    session.add(
+                        FranchiseEntry(
+                            franchise_id=franchise.id,
+                            anime_id=anime.id if entry_data["entry_type"] == "tv" else None,
+                            title=entry_data["title"],
+                            entry_type=entry_data["entry_type"],
+                            release_order=entry_data["release_order"],
+                            chronological_order=entry_data["chronological_order"],
+                            note=entry_data.get("note"),
+                        )
+                    )
 
     await session.commit()
 
