@@ -22,8 +22,10 @@ SEED_ANIME: list[dict] = [
     {
         "slug": "classroom-of-the-elite",
         "title": "Classroom of the Elite",
-        "total_episodes": 37,
-        "season_episode_counts": [12, 13, 12],
+        # Seasons 1-4 (12 + 13 + 12 + 16). Season 4 aired Apr 1 - Jun 24, 2026 and is
+        # complete, verified against Wikipedia's episode listing.
+        "total_episodes": 53,
+        "season_episode_counts": [12, 13, 12, 16],
         "mal_id": 35507,
         "anilist_id": 98659,
         "cover_image_url": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx98659-WNyPLIZDpGGY.jpg",
@@ -134,6 +136,66 @@ SEED_ANIME: list[dict] = [
                     "solved rather than a game to be enjoyed."
                 ),
             },
+            {
+                "name": "Ken Sudo",
+                "faction": "Class D",
+                "role": "Class D Student",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b207025-gpnIy6ewtfVu.png",
+                "backstory": (
+                    "A hot-blooded, athletically gifted Class D student who reacts "
+                    "to insults about his class with his fists first and his head "
+                    "second."
+                ),
+            },
+            {
+                "name": "Kei Karuizawa",
+                "faction": "Class D",
+                "role": "Class D Student",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b141122-6Zk52eU3VK3O.png",
+                # Public-facing description only — her real circumstances are a
+                # much later story reveal, not something this dataset gates a
+                # fact for yet, so the backstory stops at what Class D itself
+                # sees of her.
+                "backstory": (
+                    "A popular, fashion-conscious Class D student at the center "
+                    "of her own tight social circle, well known throughout the "
+                    "class though rarely seen without her group of friends."
+                ),
+            },
+            {
+                "name": "Airi Sakura",
+                "faction": "Class D",
+                "role": "Class D Student",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b123215-sMQJk35TqQv4.jpg",
+                "backstory": (
+                    "A quiet, camera-shy Class D student with a passion for "
+                    "photography, more comfortable observing from behind a lens "
+                    "than speaking up in a crowd."
+                ),
+            },
+            {
+                "name": "Rokusuke Kouenji",
+                "faction": "Class D",
+                "role": "Class D Student",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b158988-P28e8SU3WpGK.png",
+                "backstory": (
+                    "An eccentric, supremely self-assured Class D student who "
+                    "answers to no one and involves himself in class affairs "
+                    "strictly on his own terms."
+                ),
+            },
+            {
+                "name": "Ryuuji Kanzaki",
+                "faction": "Class C",
+                "role": "Class C Student",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b207022-dfXyWDXyBVKC.png",
+                "first_revealed_at": "S1E4",
+                "backstory": (
+                    "A composed, well-liked Class C student who acts as a "
+                    "steady counterbalance to his class's more aggressive "
+                    "leader, respected by classmates across multiple classes."
+                ),
+            },
         ],
         "franchise_entries": [
             {
@@ -142,10 +204,10 @@ SEED_ANIME: list[dict] = [
                 "release_order": 1,
                 "chronological_order": 1,
                 "note": (
-                    "No movies or OVAs exist for this series. Seasons 4 and 5 have "
-                    "since been announced/aired in real life but aren't in "
-                    "AniFerret's tracked dossier yet — this watch order only covers "
-                    "the 3 seasons currently seeded."
+                    "No movies or OVAs exist for this series. Season 5 has since "
+                    "been announced (June 2026) but has no episode count or air "
+                    "date yet, so it isn't reflected in the watch progress range "
+                    "above — check back once it airs."
                 ),
             },
         ],
@@ -254,6 +316,50 @@ SEED_ANIME: list[dict] = [
                     "for reasons of her own."
                 ),
             },
+            {
+                "name": "Nunnally Lamperouge",
+                "faction": "Holy Britannian Empire",
+                "role": "Ashford Academy Student",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1110-TSlN2WkhDJ1T.png",
+                "backstory": (
+                    "Lelouch's gentle, unfailingly kind younger sister, blind and "
+                    "unable to walk since childhood, whose safety and happiness "
+                    "are the one thing Lelouch will do anything to protect."
+                ),
+            },
+            {
+                "name": "Milly Ashford",
+                "faction": "Holy Britannian Empire",
+                "role": "Student Council President, Ashford Academy",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1121-Y3ye9sw1u3Eh.jpg",
+                "backstory": (
+                    "The energetic, mischievous granddaughter of Ashford "
+                    "Academy's chairman, who runs the student council with a "
+                    "flair for theatrics and an eye for gossip."
+                ),
+            },
+            {
+                "name": "Rivalz Cardemonde",
+                "faction": "Holy Britannian Empire",
+                "role": "Student Council Member, Ashford Academy",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1122-tzCSm261b2RP.png",
+                "backstory": (
+                    "Lelouch's easygoing best friend and fellow Ashford Academy "
+                    "student council member, always first to suggest a bet or a "
+                    "scheme to liven things up."
+                ),
+            },
+            {
+                "name": "Cécile Croomy",
+                "faction": "Holy Britannian Empire",
+                "role": "Britannian Military Engineer, Lancelot Development Team",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1131-8B8jxeFXEzld.jpg",
+                "backstory": (
+                    "A skilled Britannian military engineer on the Lancelot "
+                    "development team, whose calm professionalism balances out "
+                    "her eccentric research partner, Lloyd Asplund."
+                ),
+            },
         ],
         "franchise_entries": [
             {
@@ -327,8 +433,12 @@ SEED_ANIME: list[dict] = [
     {
         "slug": "attack-on-titan",
         "title": "Attack on Titan",
-        "total_episodes": 25,
-        "season_episode_counts": [25],
+        # Seasons 1-4 (25 + 12 + 22 + 28), verified against MAL/Wikipedia's episode
+        # counts per season. The two 2023 "Final Chapters" TV specials are tracked as
+        # a separate franchise_entries row below rather than folded in here, matching
+        # how the Season 1 recap compilation movies are kept out of the season count.
+        "total_episodes": 87,
+        "season_episode_counts": [25, 12, 22, 28],
         "mal_id": 16498,
         "anilist_id": 16498,
         "cover_image_url": "https://cdn.myanimelist.net/images/anime/10/47347l.jpg",
@@ -443,6 +553,124 @@ SEED_ANIME: list[dict] = [
                     "humanity's freedom."
                 ),
             },
+            # The following 104th trainees are the show's own top-10 graduating
+            # ranking, all named together at the graduation ceremony shown in
+            # Episode 1 (verified) — same debut checkpoint as Eren/Mikasa/Armin/
+            # Annie above. Backstories deliberately stop at each trainee's public
+            # role/personality, never their later story arcs.
+            {
+                "name": "Jean Kirstein",
+                "faction": "104th Cadet Corps",
+                "role": "104th Cadet Corps Trainee",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b46498-ritqAj9FW6jX.png",
+                "backstory": (
+                    "A pragmatic, sharp-tongued trainee who enlisted hoping for a "
+                    "safe post in the interior Military Police Brigade, frequently "
+                    "butting heads with Eren over their very different reasons for "
+                    "fighting."
+                ),
+                "first_revealed_at": "S1E1",
+            },
+            {
+                "name": "Connie Springer",
+                "faction": "104th Cadet Corps",
+                "role": "104th Cadet Corps Trainee",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/n46486-izhPjzut6WCZ.png",
+                "backstory": (
+                    "An easygoing, high-energy trainee from the mountain village "
+                    "of Ragako, better known among his classmates for his comic "
+                    "timing than for taking training too seriously."
+                ),
+                "first_revealed_at": "S1E1",
+            },
+            {
+                "name": "Sasha Blouse",
+                "faction": "104th Cadet Corps",
+                "role": "104th Cadet Corps Trainee",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b45887-QPtJH0KwqthW.jpg",
+                "backstory": (
+                    "A skilled hunter from a remote mountain village, instantly "
+                    "recognizable among her fellow trainees for her sharp "
+                    "instincts, easy laugh, and famously insatiable appetite."
+                ),
+                "first_revealed_at": "S1E1",
+            },
+            {
+                "name": "Krista Lenz",
+                "faction": "104th Cadet Corps",
+                "role": "104th Cadet Corps Trainee",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b62481-ZZDa7vn17lMU.png",
+                "backstory": (
+                    "A gentle, selfless trainee adored by her classmates for "
+                    "always putting others first, though she rarely talks about "
+                    "her life before joining the 104th."
+                ),
+                "first_revealed_at": "S1E1",
+            },
+            {
+                "name": "Reiner Braun",
+                "faction": "104th Cadet Corps",
+                "role": "104th Cadet Corps Trainee",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b46484-P6A2GjNQn49F.png",
+                "backstory": (
+                    "A steady, level-headed trainee from Wall Rose, seen by most "
+                    "of the 104th as a reliable, big-brother figure who looks out "
+                    "for the group."
+                ),
+                "first_revealed_at": "S1E1",
+            },
+            {
+                "name": "Bertolt Hoover",
+                "faction": "104th Cadet Corps",
+                "role": "104th Cadet Corps Trainee",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b46488-wm6HvkdkHoZu.jpg",
+                "backstory": (
+                    "A tall, quiet trainee who prefers to stay out of the "
+                    "spotlight, inseparable from his closest friend and fellow "
+                    "trainee Reiner Braun."
+                ),
+                "first_revealed_at": "S1E1",
+            },
+            {
+                "name": "Marco Bott",
+                "faction": "104th Cadet Corps",
+                "role": "104th Cadet Corps Trainee",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b62479-mYcTkU1RXymL.jpg",
+                "backstory": (
+                    "An earnest, dependable trainee who genuinely admires the "
+                    "Military Police's ideals of order and service, well liked "
+                    "across the 104th for his honesty."
+                ),
+                "first_revealed_at": "S1E1",
+            },
+            {
+                "name": "Hannes",
+                "faction": "Garrison",
+                "role": "Garrison Regiment Soldier",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b46492-5kRaMLDCVD0B.jpg",
+                "backstory": (
+                    "A good-natured, hard-drinking Garrison soldier stationed in "
+                    "Shiganshina, and a long-time family friend of the Yeager and "
+                    "Ackerman households."
+                ),
+                "first_revealed_at": "S1E1",
+            },
+            {
+                "name": "Hange Zoe",
+                "faction": "Survey Corps",
+                "role": "Survey Corps, Titan Research Squad",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b71121-7R7CnQd3lHgt.png",
+                "backstory": (
+                    "An endlessly curious, unconventional Survey Corps member "
+                    "whose fascination with Titans as subjects of study — not "
+                    "just enemies to kill — sets her apart from most of her "
+                    "peers."
+                ),
+                # Named/substantive debut confirmed to Episode 15 ("Special
+                # Operations Squad"), the same arc as Levi above — earlier crowd
+                # appearances aren't a real introduction.
+                "first_revealed_at": "S1E15",
+            },
         ],
         "franchise_entries": [
             {
@@ -450,7 +678,22 @@ SEED_ANIME: list[dict] = [
                 "entry_type": "tv",
                 "release_order": 1,
                 "chronological_order": 2,
-                "note": "Our tracked dossier covers Season 1.",
+                "note": (
+                    "Watch progress tracks all 4 seasons (87 episodes). Character "
+                    "and fact dossier content currently covers Season 1 only — "
+                    "Seasons 2-4 checkpoints are unlocked but reveal no new facts "
+                    "yet."
+                ),
+            },
+            {
+                "title": "Attack on Titan: The Final Chapters (TV specials)",
+                "entry_type": "special",
+                "release_order": 4,
+                "chronological_order": 4,
+                "note": (
+                    "Two feature-length specials (2023) concluding the story. Not "
+                    "counted in the season_episode_counts checkpoint range above."
+                ),
             },
             {
                 "title": "Attack on Titan: No Regrets (OVA)",
@@ -525,12 +768,19 @@ SEED_ANIME: list[dict] = [
     {
         "slug": "one-piece",
         "title": "One Piece",
-        "total_episodes": 1120,
+        # One Piece airs weekly and has no fixed finale, so this number goes stale
+        # again over time — 1176 was the latest confirmed aired episode as of
+        # 2026-09-01 (verified against Wikipedia's episode list). There's no
+        # auto-refresh: `total_episodes`/`season_episode_counts` are only set here
+        # at seed time, so this needs a manual bump periodically (the /sources
+        # endpoint surfaces a conflict against live Jikan/AniList data but doesn't
+        # write it back).
+        "total_episodes": 1176,
         # A single continuous season: the Watch Progress slider represents plain
-        # sequential episode numbers (Ep. 1 -> Ep. 1120) rather than per-arc season
+        # sequential episode numbers (Ep. 1 -> Ep. 1176) rather than per-arc season
         # boundaries. Checkpoints below ("S1E<n>") use n as that raw global episode
         # number directly.
-        "season_episode_counts": [1120],
+        "season_episode_counts": [1176],
         "mal_id": 21,
         "anilist_id": 21,
         "cover_image_url": "https://cdn.myanimelist.net/images/anime/1244/138851l.jpg",
@@ -568,6 +818,49 @@ SEED_ANIME: list[dict] = [
                 "name": "Whitebeard Pirates",
                 "parent": "Four Emperors (Yonko)",
                 "description": "One of the most powerful pirate crews on the seas, led by Whitebeard.",
+            },
+            {
+                "name": "Red-Hair Pirates",
+                "parent": "Four Emperors (Yonko)",
+                "description": "A powerful, close-knit crew led by Red-Haired Shanks.",
+            },
+            {
+                "name": "Buggy Pirates",
+                "parent": "Pirate Crews",
+                "description": "A flashy, chaotic crew led by Buggy the Clown.",
+            },
+            {
+                "name": "Alvida Pirates",
+                "parent": "Pirate Crews",
+                "description": "A small-time pirate crew led by Alvida, active near the East Blue.",
+            },
+            {
+                "name": "Krieg Pirates",
+                "parent": "Pirate Crews",
+                "description": "A fifty-ship armada led by Don Krieg, self-proclaimed strongest crew in the East Blue.",
+            },
+            {
+                "name": "Arlong Pirates",
+                "parent": "Pirate Crews",
+                "description": "A Fish-Man pirate crew led by Arlong, ruling over the village of Cocoyasi.",
+            },
+            {
+                "name": "Bliking Pirates",
+                "parent": "Pirate Crews",
+                "description": "A pirate crew led by Wapol, the deposed king of Drum Kingdom.",
+            },
+            {
+                "name": "Giants of Elbaf",
+                "description": "Warriors from the giants' homeland of Elbaf, bound by a fierce code of honor.",
+            },
+            {
+                "name": "World Government",
+                "description": "The global political body whose authority the Marines enforce across the seas.",
+            },
+            {
+                "name": "Marines",
+                "parent": "World Government",
+                "description": "The naval military force enforcing World Government law across the seas.",
             },
         ],
         "characters": [
@@ -730,6 +1023,25 @@ SEED_ANIME: list[dict] = [
                 "first_revealed_at": "S1E76",
             },
             {
+                "name": "Edward Newgate",
+                "faction": "Whitebeard Pirates",
+                # "Yonko" (Emperor) is a title held by a crew's captain alone, not
+                # the crew as a whole — without him seeded, the "Four Emperors
+                # (Yonko)" faction card only ever showed his subordinate Ace,
+                # which reads as if Ace himself held Emperor status. Role text
+                # spells that distinction out explicitly for the same reason.
+                "role": "Captain, Whitebeard Pirates — one of the Four Emperors (Yonko)",
+                "height": "666 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2751-NnzW0N2vCTjX.jpg",
+                "backstory": (
+                    "Widely known as \"Whitebeard,\" captain of the Whitebeard "
+                    "Pirates and one of the four Emperors who rule the New World. "
+                    "Feared across the seas as the man closest to claiming the "
+                    "One Piece himself."
+                ),
+                "first_revealed_at": "S1E151",
+            },
+            {
                 "name": "Portgas D. Ace",
                 "faction": "Whitebeard Pirates",
                 "role": "2nd Division Commander, Whitebeard Pirates",
@@ -741,6 +1053,126 @@ SEED_ANIME: list[dict] = [
                     "Pirates, one of the most powerful crews on the Grand Line."
                 ),
                 "first_revealed_at": "S1E91",
+            },
+            {
+                "name": "Shanks",
+                "faction": "Red-Hair Pirates",
+                "role": "Captain, Red-Hair Pirates — one of the Four Emperors (Yonko)",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b727-wUJx7M1z5xON.png",
+                "backstory": (
+                    "A legendary pirate captain whose visit to Luffy's hometown "
+                    "left a lasting mark on the boy who now wears his old straw "
+                    "hat — and dreams of returning it to him one day, as the "
+                    "world's greatest pirate."
+                ),
+                "first_revealed_at": "S1E1",
+            },
+            {
+                "name": "Buggy",
+                "faction": "Buggy Pirates",
+                "role": "Captain, Buggy Pirates",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/n725-g04AaiaK5f9B.png",
+                "power": "Bara Bara no Mi",
+                "backstory": (
+                    "A flamboyant, short-tempered pirate captain who ate the "
+                    "Bara Bara no Mi, letting him split his own body apart at "
+                    "will — and fiercely resents any reminder of his old "
+                    "crewmate, Red-Haired Shanks."
+                ),
+                "first_revealed_at": "S1E4",
+            },
+            {
+                "name": "Smoker",
+                "faction": "Marines",
+                "role": "Marine Captain, Loguetown",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2753-Y2ja8Pl6PRs0.jpg",
+                "power": "Moku Moku no Mi",
+                "backstory": (
+                    "An unusually principled Marine captain stationed in "
+                    "Loguetown, whose relentless pursuit of Luffy stems less "
+                    "from ambition than a rigid, uncompromising sense of "
+                    "justice."
+                ),
+                "first_revealed_at": "S1E48",
+            },
+            {
+                "name": "Alvida",
+                "faction": "Alvida Pirates",
+                "role": "Captain, Alvida Pirates",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b4899-bFPCVRWyqMtO.jpg",
+                "backstory": (
+                    "A pirate captain whose crew terrorized the seas near "
+                    "Luffy's home village until her very first clash with him "
+                    "— the encounter that set his journey in motion."
+                ),
+                "first_revealed_at": "S1E1",
+            },
+            {
+                "name": "Don Krieg",
+                "faction": "Krieg Pirates",
+                "role": "Captain, Krieg Pirates",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b9320-lHsw9jNk5889.png",
+                "backstory": (
+                    "The self-proclaimed strongest man in the East Blue, "
+                    "commanding a fleet of fifty ships in his ambition to "
+                    "conquer the Grand Line."
+                ),
+                # Baratie arc confirmed to start Episode 19; Krieg's own arrival
+                # is a few episodes into it. Best-effort estimate, kept
+                # deliberately later rather than earlier to avoid any risk of
+                # an early reveal.
+                "first_revealed_at": "S1E21",
+            },
+            {
+                "name": "Arlong",
+                "faction": "Arlong Pirates",
+                "role": "Captain, Arlong Pirates",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b4887-hMOqSSpR5jFc.jpg",
+                "backstory": (
+                    "A powerful Fish-Man pirate captain who rules the East "
+                    "Blue village of Cocoyasi with an iron fist, backed by a "
+                    "crew as fearsome as he is."
+                ),
+                # Arlong Park arc start, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E31",
+            },
+            {
+                "name": "Dorry",
+                "faction": "Giants of Elbaf",
+                "role": "Elbaf Giant Warrior",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/5420.jpg",
+                "backstory": (
+                    "One of two legendary giant warriors from the distant "
+                    "land of Elbaf, locked in a duel of honor with his old "
+                    "friend and rival Brogy that has lasted a hundred years."
+                ),
+                # Little Garden arc start, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E70",
+            },
+            {
+                "name": "Brogy",
+                "faction": "Giants of Elbaf",
+                "role": "Elbaf Giant Warrior",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/5421.jpg",
+                "backstory": (
+                    "One of two legendary giant warriors from the distant "
+                    "land of Elbaf, locked in a duel of honor with his old "
+                    "friend and rival Dorry that has lasted a hundred years."
+                ),
+                "first_revealed_at": "S1E70",
+            },
+            {
+                "name": "Wapol",
+                "faction": "Bliking Pirates",
+                "role": "Captain, Bliking Pirates",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b5422-QfzPleyyng7n.jpg",
+                "backstory": (
+                    "The deposed king of Drum Kingdom turned pirate captain, "
+                    "ruling his Bliking Pirates crew with the same petty "
+                    "tyranny he once ruled his kingdom."
+                ),
+                # Drum Island arc start, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E78",
             },
         ],
         "franchise_entries": [

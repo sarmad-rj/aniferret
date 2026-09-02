@@ -5,8 +5,19 @@ import NavBar from "../NavBar";
 import GroupModeModal from "../GroupModeModal";
 import GroupModeBanner from "../GroupModeBanner";
 import ImportAnimeModal from "../ImportAnimeModal";
+import AuthModal from "../AuthModal";
+import { useAuth } from "../../context/useAuth";
 import useAnimeCatalog from "../../hooks/useAnimeCatalog";
 import { buildCheckpointSequence } from "../../lib/checkpoint";
+import { fetchWatchProgress, saveWatchProgress } from "../../lib/api";
+import {
+  getGuestCheckpoint,
+  setGuestCheckpoint,
+} from "../../lib/guestProgress";
+import {
+  getStoredSelectedSlug,
+  setStoredSelectedSlug,
+} from "../../lib/selectedAnime";
 
 function AppLayout() {
   const [searchParams] = useSearchParams();
@@ -16,6 +27,10 @@ function AppLayout() {
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [groupCheckpoint, setGroupCheckpoint] = useState(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [remoteProgressBySlug, setRemoteProgressBySlug] = useState({});
+  const [progressLoadedForToken, setProgressLoadedForToken] =
+    useState(undefined);
   const selectedSlugRef = useRef(selectedSlug);
 
   const {
@@ -23,14 +38,28 @@ function AppLayout() {
     error: animeError,
     refetch: refetchAnimeList,
   } = useAnimeCatalog();
+  const { isAuthenticated, isLoading: isAuthLoading, token } = useAuth();
 
   const selectedAnime =
     animeList.find((anime) => anime.slug === selectedSlug) ?? null;
   const isGroupModeActive = groupCheckpoint !== null;
   const activeCheckpoint = isGroupModeActive ? groupCheckpoint : checkpoint;
+  // Derived synchronously each render rather than a separate "isLoading" flag that
+  // only flips true from inside an effect: on the very render isAuthenticated first
+  // becomes true, an effect-order race could let the checkpoint-seeding effect below
+  // run before a lagging loading flag had a chance to be set, seeding from an empty
+  // remoteProgressBySlug and permanently missing the real saved checkpoint once it
+  // arrived (the seeding effect never re-runs after checkpoint is set). Comparing
+  // against the token itself has no such lag — it's wrong (not yet matching) on that
+  // same render for free, with no dependency on effect execution order.
+  const isRemoteProgressReady =
+    !isAuthenticated || progressLoadedForToken === token;
 
   useEffect(() => {
     selectedSlugRef.current = selectedSlug;
+    if (selectedSlug) {
+      setStoredSelectedSlug(selectedSlug);
+    }
   }, [selectedSlug]);
 
   useEffect(() => {
@@ -50,27 +79,115 @@ function AppLayout() {
     }
 
     if (!selectedSlugRef.current) {
-      setSelectedSlug(animeList[0].slug);
+      const storedSlug = getStoredSelectedSlug();
+      const storedAnime = animeList.find((anime) => anime.slug === storedSlug);
+      setSelectedSlug((storedAnime ?? animeList[0]).slug);
     }
     // Reads selectedSlugRef instead of depending on selectedSlug: this effect should
     // only re-sync from the URL when the URL itself changes (a Discover/Watch-Order
     // link navigation), not when selectedSlug changes via the header dropdown —
     // otherwise a stale ?anime= param fights every manual selection back to itself.
+    //
+    // The no-param branch (a bare reload/direct visit) falls back to the
+    // last-selected anime persisted in localStorage rather than always
+    // animeList[0] — otherwise every reload silently jumped back to whichever
+    // anime happened to sort first, discarding whatever the user was viewing.
   }, [animeList, searchParams]);
 
   useEffect(() => {
-    if (selectedAnime && !checkpoint) {
-      const sequence = buildCheckpointSequence(
-        selectedAnime.season_episode_counts,
-      );
-      setCheckpoint(sequence[0] ?? null);
+    if (!isAuthenticated || !token) {
+      setRemoteProgressBySlug({});
+      setProgressLoadedForToken(undefined);
+      return undefined;
     }
-  }, [selectedAnime, checkpoint]);
+
+    let isMounted = true;
+    fetchWatchProgress(token)
+      .then((response) => {
+        if (!isMounted) {
+          return;
+        }
+        const bySlug = {};
+        for (const entry of response.entries) {
+          bySlug[entry.anime_slug] = entry.checkpoint;
+        }
+        setRemoteProgressBySlug(bySlug);
+      })
+      .catch(() => {
+        // Non-fatal — checkpoint seeding just falls back to the sequence start.
+      })
+      .finally(() => {
+        if (isMounted) {
+          setProgressLoadedForToken(token);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, token]);
+
+  useEffect(() => {
+    if (
+      !selectedAnime ||
+      checkpoint ||
+      isAuthLoading ||
+      !isRemoteProgressReady
+    ) {
+      return;
+    }
+
+    const savedCheckpoint = isAuthenticated
+      ? remoteProgressBySlug[selectedAnime.slug]
+      : getGuestCheckpoint(selectedAnime.slug);
+
+    if (savedCheckpoint) {
+      setCheckpoint(savedCheckpoint);
+      return;
+    }
+
+    const sequence = buildCheckpointSequence(
+      selectedAnime.season_episode_counts,
+    );
+    setCheckpoint(sequence[0] ?? null);
+  }, [
+    selectedAnime,
+    checkpoint,
+    isAuthLoading,
+    isAuthenticated,
+    isRemoteProgressReady,
+    remoteProgressBySlug,
+  ]);
 
   const handleSelectAnime = (slug) => {
     setSelectedSlug(slug);
     setCheckpoint(null);
     setGroupCheckpoint(null);
+  };
+
+  const handleCheckpointChange = (newCheckpoint) => {
+    setCheckpoint(newCheckpoint);
+    if (!selectedAnime) {
+      return;
+    }
+    if (isAuthenticated && token) {
+      saveWatchProgress(token, [
+        { anime_slug: selectedAnime.slug, checkpoint: newCheckpoint },
+      ]).catch(() => {
+        // Non-fatal — the slider already moved locally; the save can be retried
+        // implicitly next time the checkpoint changes.
+      });
+    } else {
+      setGuestCheckpoint(selectedAnime.slug, newCheckpoint);
+    }
+  };
+
+  const handleOpenGroupModal = () => {
+    if (isAuthenticated) {
+      setIsGroupModalOpen(true);
+    } else {
+      setIsAuthModalOpen(true);
+    }
   };
 
   const handleApplyGroupMode = (effectiveCheckpoint) => {
@@ -124,16 +241,17 @@ function AppLayout() {
           selectedSlug,
           activeCheckpoint,
           isGroupModeActive,
-          setCheckpoint,
+          setCheckpoint: handleCheckpointChange,
           isRewatchMode,
           setIsRewatchMode,
-          onOpenGroupModal: () => setIsGroupModalOpen(true),
+          onOpenGroupModal: handleOpenGroupModal,
         }}
       />
 
       {isGroupModalOpen && checkpointSequence.length > 0 && (
         <GroupModeModal
           checkpointSequence={checkpointSequence}
+          token={token}
           onApply={handleApplyGroupMode}
           onClose={() => setIsGroupModalOpen(false)}
         />
@@ -143,6 +261,14 @@ function AppLayout() {
         <ImportAnimeModal
           onImported={handleAnimeImported}
           onClose={() => setIsImportModalOpen(false)}
+        />
+      )}
+
+      {isAuthModalOpen && (
+        <AuthModal
+          contextMessage="An account is required to create or join a shared watch room in Group Mode."
+          onAuthenticated={() => setIsGroupModalOpen(true)}
+          onClose={() => setIsAuthModalOpen(false)}
         />
       )}
     </div>

@@ -213,7 +213,13 @@ _DEFAULT_EPISODE_FALLBACK = 24
 series like One Piece, where the real total isn't fixed) — a conservative single-season
 default rather than guessing an arbitrarily large number."""
 
-_MAX_CHARACTERS_TO_INGEST = 8
+_MAX_CHARACTERS_TO_INGEST = 40
+"""Was 8 — a deliberately small demo-safe default from when this pipeline was new and
+unproven. Each character costs 2 Gemini calls (extract_facts_from_character +
+extract_debut_episode; see below), so this is the real lever on both API spend and
+free-tier request-per-day usage, independent of Gemini's own account-level rate limit.
+Changing this number alone makes zero Gemini calls by itself — it only takes effect the
+next time import_anime/ingest_character_roster actually runs."""
 
 _EXTRACTION_MODEL_NAME = "gemini-3.6-flash"
 

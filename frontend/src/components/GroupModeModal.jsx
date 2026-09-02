@@ -4,7 +4,7 @@ import useBodyScrollLock from "../hooks/useBodyScrollLock";
 import { postGroupSessionEvaluate } from "../lib/api";
 import { formatCheckpointLabel } from "../lib/checkpoint";
 
-function GroupModeModal({ checkpointSequence, onApply, onClose }) {
+function GroupModeModal({ checkpointSequence, token, onApply, onClose }) {
   const [watcherCheckpoints, setWatcherCheckpoints] = useState([
     checkpointSequence[0],
     checkpointSequence[0],
@@ -34,7 +34,10 @@ function GroupModeModal({ checkpointSequence, onApply, onClose }) {
     setIsSubmitting(true);
 
     try {
-      const response = await postGroupSessionEvaluate(watcherCheckpoints);
+      const response = await postGroupSessionEvaluate(
+        watcherCheckpoints,
+        token,
+      );
       onApply(response.effective_checkpoint);
     } catch {
       setError("Could not evaluate the group session. Please try again.");

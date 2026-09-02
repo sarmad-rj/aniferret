@@ -155,3 +155,18 @@ def _no_live_gemini_calls(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture
 def client() -> TestClient:
     return TestClient(app)
+
+
+@pytest.fixture(scope="session")
+def auth_token() -> str:
+    """A valid bearer token for one shared test user, registered once per test
+    session — for tests that need *some* authenticated identity (e.g. Group Mode
+    gating) without caring which one. Tests exercising register/login itself use
+    their own distinct emails instead, via the `client` fixture directly."""
+    with TestClient(app) as session_client:
+        response = session_client.post(
+            "/api/v1/auth/register",
+            json={"email": "fixture-user@example.com", "password": "password123"},
+        )
+        assert response.status_code == 201
+        return response.json()["access_token"]

@@ -5,6 +5,8 @@ from app.models.faction import Faction
 from app.models.franchise import Franchise
 from app.models.franchise_entry import FranchiseEntry
 from app.models.temporal_fact import TemporalFact
+from app.models.user import User
+from app.models.watch_progress import WatchProgress
 
 __all__ = [
     "Anime",
@@ -14,4 +16,6 @@ __all__ = [
     "Franchise",
     "FranchiseEntry",
     "TemporalFact",
+    "User",
+    "WatchProgress",
 ]
