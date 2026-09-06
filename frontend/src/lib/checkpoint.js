@@ -24,3 +24,7 @@ export function parseCheckpointEpisode(checkpoint) {
   const match = CHECKPOINT_RE.exec(checkpoint ?? "");
   return match ? Number(match[2]) : null;
 }
+
+export function isValidCheckpointFormat(checkpoint) {
+  return CHECKPOINT_RE.test(checkpoint ?? "");
+}

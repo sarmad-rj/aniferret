@@ -1,14 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { Outlet, useSearchParams } from "react-router-dom";
+import {
+  Outlet,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import Header from "../Header";
 import NavBar from "../NavBar";
 import GroupModeModal from "../GroupModeModal";
 import GroupModeBanner from "../GroupModeBanner";
-import ImportAnimeModal from "../ImportAnimeModal";
 import AuthModal from "../AuthModal";
 import { useAuth } from "../../context/useAuth";
 import useAnimeCatalog from "../../hooks/useAnimeCatalog";
-import { buildCheckpointSequence } from "../../lib/checkpoint";
+import {
+  buildCheckpointSequence,
+  isValidCheckpointFormat,
+} from "../../lib/checkpoint";
 import { fetchWatchProgress, saveWatchProgress } from "../../lib/api";
 import {
   getGuestCheckpoint,
@@ -19,6 +26,18 @@ import {
   setStoredSelectedSlug,
 } from "../../lib/selectedAnime";
 
+// Routes whose page component reads selectedAnime/selectedSlug off the Outlet
+// context and reacts to it directly (see DossiersPage/LoreAssistantPage/
+// WatchOrderPage's own useOutletContext() calls) — picking a new anime from the
+// header dropdown while already on one of these just updates what's shown in
+// place. Anywhere else under /app (Discover, Profile) ignores that context
+// entirely, so without this the dropdown would silently do nothing.
+const ANIME_CONTEXT_AWARE_PATHS = [
+  "/app/dossiers",
+  "/app/lore-assistant",
+  "/app/watch-order",
+];
+
 function AppLayout() {
   const [searchParams] = useSearchParams();
   const [selectedSlug, setSelectedSlug] = useState(null);
@@ -26,19 +45,16 @@ function AppLayout() {
   const [isRewatchMode, setIsRewatchMode] = useState(false);
   const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
   const [groupCheckpoint, setGroupCheckpoint] = useState(null);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [remoteProgressBySlug, setRemoteProgressBySlug] = useState({});
   const [progressLoadedForToken, setProgressLoadedForToken] =
     useState(undefined);
   const selectedSlugRef = useRef(selectedSlug);
 
-  const {
-    animeList,
-    error: animeError,
-    refetch: refetchAnimeList,
-  } = useAnimeCatalog();
+  const { animeList, error: animeError } = useAnimeCatalog();
   const { isAuthenticated, isLoading: isAuthLoading, token } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const selectedAnime =
     animeList.find((anime) => anime.slug === selectedSlug) ?? null;
@@ -93,6 +109,31 @@ function AppLayout() {
     // animeList[0] — otherwise every reload silently jumped back to whichever
     // anime happened to sort first, discarding whatever the user was viewing.
   }, [animeList, searchParams]);
+
+  useEffect(() => {
+    // Deliberately separate from the anime-slug sync effect above rather than
+    // folded into it: that effect only resets checkpoint to null (letting the
+    // saved-progress-seeding effect below fill it in) when the *anime* changes,
+    // so an explicit ?checkpoint= param -- e.g. Profile's "Resume Timeline" button
+    // -- would otherwise be silently dropped whenever it targets the
+    // already-selected anime. checkpoint is intentionally left out of the
+    // dependency array: this should apply the URL's checkpoint once selectedAnime
+    // settles, not fight back every time the user moves the slider afterward.
+    if (!selectedAnime) {
+      return;
+    }
+    const requestedCheckpoint = searchParams.get("checkpoint");
+    if (
+      requestedCheckpoint &&
+      isValidCheckpointFormat(requestedCheckpoint) &&
+      requestedCheckpoint !== checkpoint
+    ) {
+      setCheckpoint(requestedCheckpoint);
+      setGroupCheckpoint(null);
+    }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- checkpoint read, not
+    // depended on; see comment above.
+  }, [selectedAnime, searchParams]);
 
   useEffect(() => {
     if (!isAuthenticated || !token) {
@@ -163,6 +204,13 @@ function AppLayout() {
     setSelectedSlug(slug);
     setCheckpoint(null);
     setGroupCheckpoint(null);
+
+    const isOnAnimeContextAwarePage = ANIME_CONTEXT_AWARE_PATHS.some((path) =>
+      location.pathname.startsWith(path),
+    );
+    if (!isOnAnimeContextAwarePage) {
+      navigate(`/app/dossiers?anime=${slug}`);
+    }
   };
 
   const handleCheckpointChange = (newCheckpoint) => {
@@ -199,12 +247,6 @@ function AppLayout() {
     setGroupCheckpoint(null);
   };
 
-  const handleAnimeImported = async (importedAnime) => {
-    setIsImportModalOpen(false);
-    await refetchAnimeList();
-    handleSelectAnime(importedAnime.slug);
-  };
-
   const checkpointSequence = selectedAnime
     ? buildCheckpointSequence(selectedAnime.season_episode_counts)
     : [];
@@ -215,9 +257,8 @@ function AppLayout() {
         animeList={animeList}
         selectedSlug={selectedSlug}
         onSelectAnime={handleSelectAnime}
-        onOpenImport={() => setIsImportModalOpen(true)}
       />
-      <NavBar />
+      {location.pathname !== "/app/profile" && <NavBar />}
 
       {animeError && (
         <p className="mx-auto mt-6 max-w-6xl rounded-lg border border-[var(--pink)] bg-[var(--pink-light)] p-4 text-sm text-[var(--primary)]">
@@ -254,13 +295,6 @@ function AppLayout() {
           token={token}
           onApply={handleApplyGroupMode}
           onClose={() => setIsGroupModalOpen(false)}
-        />
-      )}
-
-      {isImportModalOpen && (
-        <ImportAnimeModal
-          onImported={handleAnimeImported}
-          onClose={() => setIsImportModalOpen(false)}
         />
       )}
 
