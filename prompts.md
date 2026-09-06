@@ -502,3 +502,14 @@ This log tracks every turn, user instruction, agent workflow execution, tool cal
 - **Test-isolation bug found and fixed (this turn):** the new `test_rate_limiting.py` (2 tests, re-enabling the limiter locally) passed alone but failed inside the full suite. Root cause, confirmed via `inspect.getsource(Limiter.reset)`: the existing autouse `limiter.enabled = False` fixture only suppresses slowapi's *raise* on an over-limit request — the underlying hit counter keeps incrementing regardless, so ~100+ register/login calls made earlier in the suite (while "disabled") had already exhausted the 5/hour and 10/minute budgets before the dedicated tests ever flipped the limiter back on. Fixed by adding `limiter.reset()` alongside `limiter.enabled = False` in `conftest.py`'s `_disable_rate_limiting` fixture, so accumulated hits never carry over between tests.
 - **Verification:** `pytest -q` → 426 passed, 0 failed (full suite, including both rate-limit tests running as part of it — not just standalone). `npm run lint` clean (only the same pre-existing warning set from before this turn, none new — confirms this turn's backend-only changes didn't regress the frontend).
 - **Status:** Rate limiting, JWT secret generation, and the SMTP root-cause explanation were the three explicitly-ordered deliverables before Docker work begins per the user's own sequencing ("after these 3 we will continue next to docker stuff") — delivered in the same turn as this log entry. Docker work (a `backend/Dockerfile` + `.dockerignore` already exist untracked in the working tree from earlier, not yet reviewed/wired up this session) is next, pending the user's go-ahead.
+
+---
+
+### Entry: 2026-09-06 (session 16)
+- **User Prompt sequence:** "Push the code on github with clean commit message, and check in .claude directory if i made a skill or rule for files structure?"
+- **Actions & Analysis:**
+  - Audited `.claude` directory structure: examined `.claude/CLAUDE.md`, `.claude/skills/`, and `.claude/rules/`.
+  - Found that while there is no explicit standalone rule/skill named `file-structure` or `files-structure`, file layout and directory rules are embedded within `fastapi-standard.md` (router/backend structure), `airbnb-react.md` (frontend component organization/naming), `sqlalchemy-migrations.md` (db/alembic directory structure), and `design-theme.md` (CSS variable tokens placement).
+  - Staged and committed changes in `frontend/src/components/landing/LandingSearchBar.jsx` and updated `prompts.md` with a clean Conventional Commit message (`style(landing): update search placeholder text and log prompt entry`).
+  - Pushed commits to GitHub remote repository (`origin/main`).
+

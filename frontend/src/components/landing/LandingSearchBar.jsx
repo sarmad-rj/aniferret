@@ -81,7 +81,7 @@ function LandingSearchBar({ animeList }) {
           onChange={handleChange}
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Search for an anime to start..."
+          placeholder="Search for an anime..."
           className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] py-2.5 pl-9 pr-3 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--primary)]"
         />
       </div>
