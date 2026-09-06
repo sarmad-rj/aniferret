@@ -4,7 +4,10 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
-# Dev-only persistent state — the container gets its own via the mounted volume
+# Dev-only persistent state — never baked into the image. A fresh deploy seeds its
+# own launch-corpus data from committed Python source instead (app/db/seed.py's
+# SEED_ANIME, run via the Dockerfile CMD) rather than from this live dev copy, which
+# also carries real local user accounts that must never ship in a built image.
 aniferret.db
 chroma_store/
 

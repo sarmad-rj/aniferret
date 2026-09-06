@@ -2674,11 +2674,21 @@ async def seed_admin_user(session: AsyncSession) -> None:
     await session.commit()
 
 
-async def main() -> None:
+async def main(admin_only: bool = False) -> None:
+    """`admin_only=True` (backend/Dockerfile's `--admin-only` flag) skips `seed_all()`
+    — the container's launch-corpus data already arrives via app.core.bootstrap's
+    volume copy, so re-running the full catalog seed on every boot would just be
+    redundant idempotency-check queries. seed_admin_user() alone is what needs to run
+    on every boot: it's how ADMIN_EMAIL/ADMIN_PASSWORD actually provisions the admin
+    account in a deployed environment, since there is no public self-service
+    "register as admin" endpoint."""
     async with AsyncSessionLocal() as session:
-        await seed_all(session)
+        if not admin_only:
+            await seed_all(session)
         await seed_admin_user(session)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import sys
+
+    asyncio.run(main(admin_only="--admin-only" in sys.argv))
