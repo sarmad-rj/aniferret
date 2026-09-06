@@ -90,7 +90,17 @@ export function AuthProvider({ children }) {
   };
 
   const register = async (email, password, displayName) => {
-    const tokenResponse = await registerUser({ email, password, displayName });
+    // Registration no longer doubles as login — it creates an unverified account
+    // and emails a verification link. The caller (AuthModal) shows the returned
+    // message rather than treating this as a signed-in session.
+    return registerUser({ email, password, displayName });
+  };
+
+  // Used by VerifyEmail.jsx once /auth/verify-email hands back a real session —
+  // that's the one place outside login/register a token is minted, so it reuses
+  // the same applySession logic (guest-progress sync included) rather than
+  // duplicating it.
+  const completeSession = async (tokenResponse) => {
     await applySession(tokenResponse);
   };
 
@@ -107,6 +117,7 @@ export function AuthProvider({ children }) {
     isLoading,
     login,
     register,
+    completeSession,
     logout,
   };
 

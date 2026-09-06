@@ -3,7 +3,11 @@ user's checkpoint survive across devices/sessions instead of only living in
 localStorage (guest mode) — see app/services/watch_progress_service.py.
 """
 
+import asyncio
+
 from fastapi.testclient import TestClient
+
+from tests.conftest import _mark_verified
 
 
 def _register(client: TestClient, email: str) -> str:
@@ -11,7 +15,13 @@ def _register(client: TestClient, email: str) -> str:
         "/api/v1/auth/register", json={"email": email, "password": "password123"}
     )
     assert response.status_code == 201
-    return response.json()["access_token"]
+    asyncio.run(_mark_verified(email))
+
+    login_response = client.post(
+        "/api/v1/auth/login", json={"email": email, "password": "password123"}
+    )
+    assert login_response.status_code == 200
+    return login_response.json()["access_token"]
 
 
 def test_read_watch_progress_starts_empty(client: TestClient) -> None:
