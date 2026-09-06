@@ -6,3 +6,9 @@ asyncio_mode = "auto"
 [tool.coverage.run]
 # One-off operational scripts (seed/index/ingest CLIs), not core business logic.
 omit = ["app/db/*"]
+# TestClient dispatches each request through a background thread (an anyio portal
+# bridging sync test code to the async ASGI app), and SQLAlchemy's async engine
+# bridges to its sync drivers via greenlet — without declaring both here, coverage.py
+# only traces the pytest thread itself, silently under-reporting every line that only
+# ever runs inside a real request/response cycle.
+concurrency = ["thread", "greenlet"]

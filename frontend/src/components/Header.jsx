@@ -1,19 +1,22 @@
 import { useState } from "react";
-import { ChevronDown, LogOut, Plus, User } from "lucide-react";
+import {
+  ChevronDown,
+  LayoutDashboard,
+  LogOut,
+  User,
+  UserCircle2,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import logo from "../logo/AniFerret_Logo.png";
+import AnimeSearchBar from "./AnimeSearchBar";
 import AuthModal from "./AuthModal";
 import { useAuth } from "../context/useAuth";
 
-function Header({ animeList, selectedSlug, onSelectAnime, onOpenImport }) {
+function Header({ animeList, selectedSlug, onSelectAnime }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   const { user, isAuthenticated, logout } = useAuth();
-
-  const handleAnimeChange = (event) => {
-    onSelectAnime(event.target.value);
-  };
 
   const handleSignOut = () => {
     setIsUserMenuOpen(false);
@@ -33,29 +36,14 @@ function Header({ animeList, selectedSlug, onSelectAnime, onOpenImport }) {
         </span>
       </Link>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {animeList.length > 0 && (
-          <select
-            value={selectedSlug ?? ""}
-            onChange={handleAnimeChange}
-            className="rounded-md border border-[var(--primary-light)] bg-[var(--primary-light)] px-3 py-1.5 text-sm text-[var(--surface)]"
-          >
-            {animeList.map((anime) => (
-              <option key={anime.slug} value={anime.slug}>
-                {anime.title}
-              </option>
-            ))}
-          </select>
+          <AnimeSearchBar
+            animeList={animeList}
+            selectedSlug={selectedSlug}
+            onSelectAnime={onSelectAnime}
+          />
         )}
-
-        <button
-          type="button"
-          onClick={onOpenImport}
-          className="inline-flex items-center gap-1 rounded-md border border-[var(--sky)] px-3 py-1.5 text-sm font-medium text-[var(--sky)]"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Import
-        </button>
 
         {isAuthenticated ? (
           <div className="relative">
@@ -64,13 +52,33 @@ function Header({ animeList, selectedSlug, onSelectAnime, onOpenImport }) {
               onClick={() => setIsUserMenuOpen((previous) => !previous)}
               className="inline-flex items-center gap-1.5 rounded-md border border-[var(--primary-light)] bg-[var(--primary-light)] px-3 py-1.5 text-sm font-medium text-[var(--surface)]"
             >
-              <User className="h-3.5 w-3.5" />
-              {user?.display_name ?? user?.email}
-              <ChevronDown className="h-3.5 w-3.5" />
+              <User className="h-3.5 w-3.5 shrink-0" />
+              <span className="max-w-[7rem] truncate sm:max-w-[12rem]">
+                {user?.display_name ?? user?.email}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0" />
             </button>
 
             {isUserMenuOpen && (
               <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-md border border-[var(--border)] bg-[var(--surface)] py-1 shadow-md">
+                <Link
+                  to="/app/profile"
+                  onClick={() => setIsUserMenuOpen(false)}
+                  className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm text-[var(--text)] hover:bg-[var(--surface-warm)]"
+                >
+                  <UserCircle2 className="h-3.5 w-3.5" />
+                  My Profile
+                </Link>
+                {user?.is_admin && (
+                  <Link
+                    to="/admin"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm text-[var(--text)] hover:bg-[var(--surface-warm)]"
+                  >
+                    <LayoutDashboard className="h-3.5 w-3.5" />
+                    Admin Dashboard
+                  </Link>
+                )}
                 <button
                   type="button"
                   onClick={handleSignOut}

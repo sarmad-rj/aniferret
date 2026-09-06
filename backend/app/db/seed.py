@@ -13,8 +13,10 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
-from app.models import Anime, Character, Faction, Franchise, FranchiseEntry, TemporalFact
+from app.core.security import hash_password
+from app.models import Anime, Character, Faction, Franchise, FranchiseEntry, TemporalFact, User
 
 logger = logging.getLogger(__name__)
 
@@ -812,7 +814,16 @@ SEED_ANIME: list[dict] = [
             },
             {
                 "name": "Four Emperors (Yonko)",
-                "description": "The four most powerful pirate crews ruling the New World.",
+                # Present-tense "ruling" was itself the bug: this grouping is a
+                # historical roster, not a live one — Whitebeard died and Kaido/Big
+                # Mom were both dethroned mid-story. Membership is tracked precisely
+                # via each captain's own yonko_status/yonko_status_change facts below,
+                # not by this static description or by permanent tree nesting.
+                "description": (
+                    "Historically, the four most powerful pirate crews to hold "
+                    "Emperor status in the New World — the lineup has shifted over "
+                    "the course of the story."
+                ),
             },
             {
                 "name": "Whitebeard Pirates",
@@ -861,6 +872,40 @@ SEED_ANIME: list[dict] = [
                 "name": "Marines",
                 "parent": "World Government",
                 "description": "The naval military force enforcing World Government law across the seas.",
+            },
+            {
+                "name": "Seven Warlords of the Sea",
+                "description": (
+                    "Pirates granted government-sanctioned immunity in exchange for "
+                    "serving the World Government's interests when called upon."
+                ),
+            },
+            {
+                "name": "Big Mom Pirates",
+                "parent": "Four Emperors (Yonko)",
+                "description": "A massive pirate crew led by Charlotte Linlin, 'Big Mom.'",
+            },
+            {
+                "name": "Beast Pirates",
+                "parent": "Four Emperors (Yonko)",
+                "description": "A fearsome pirate crew led by Kaido, based in Wano Country.",
+            },
+            {
+                "name": "Revolutionary Army",
+                "description": (
+                    "An organization openly opposing the World Government, led by "
+                    "Monkey D. Dragon."
+                ),
+            },
+            {
+                "name": "Heart Pirates",
+                "parent": "Pirate Crews",
+                "description": "A pirate crew led by the surgeon Trafalgar Law.",
+            },
+            {
+                "name": "Kid Pirates",
+                "parent": "Pirate Crews",
+                "description": "A brutally aggressive pirate crew led by Eustass Kid.",
             },
         ],
         "characters": [
@@ -990,12 +1035,14 @@ SEED_ANIME: list[dict] = [
             },
             {
                 "name": "Jinbe",
-                # Unaffiliated for the same reason as Robin: his real Straw Hat
-                # membership is real-world canon common knowledge but doesn't unlock via
-                # any fact in this dataset, and is hundreds of episodes past his debut —
-                # stating it here would be an undated, ungated spoiler with no checkpoint
-                # protecting it.
-                "role": "Fish-Man Karate Master",
+                "faction": "Seven Warlords of the Sea",
+                # Faction tag (Warlord seat) is safe here: that fact is public knowledge
+                # from S1E31 onward (Yosaku names Jinbe as a sitting Warlord), long before
+                # this S1E432 debut. His eventual Straw Hat membership is a separate,
+                # much later reveal with no supporting fact in this dataset, so — same
+                # reasoning as Robin — his role text stays limited to his public standing
+                # and never states that future crew change.
+                "role": "Fish-Man Karate Master — Member, Seven Warlords of the Sea",
                 "height": "301 cm",
                 "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b18938-yZANEfjsVhW4.png",
                 "backstory": (
@@ -1030,7 +1077,10 @@ SEED_ANIME: list[dict] = [
                 # (Yonko)" faction card only ever showed his subordinate Ace,
                 # which reads as if Ace himself held Emperor status. Role text
                 # spells that distinction out explicitly for the same reason.
-                "role": "Captain, Whitebeard Pirates — one of the Four Emperors (Yonko)",
+                # Not "— one of the Four Emperors (Yonko)": he dies at S1E485 (Marineford),
+                # so a permanent claim in this always-shown field would still be wrong at
+                # every later checkpoint. Status lives in the dated facts below instead.
+                "role": "Captain, Whitebeard Pirates",
                 "height": "666 cm",
                 "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2751-NnzW0N2vCTjX.jpg",
                 "backstory": (
@@ -1058,6 +1108,7 @@ SEED_ANIME: list[dict] = [
                 "name": "Shanks",
                 "faction": "Red-Hair Pirates",
                 "role": "Captain, Red-Hair Pirates — one of the Four Emperors (Yonko)",
+                "height": "199 cm",
                 "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b727-wUJx7M1z5xON.png",
                 "backstory": (
                     "A legendary pirate captain whose visit to Luffy's hometown "
@@ -1071,6 +1122,7 @@ SEED_ANIME: list[dict] = [
                 "name": "Buggy",
                 "faction": "Buggy Pirates",
                 "role": "Captain, Buggy Pirates",
+                "height": "192 cm",
                 "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/n725-g04AaiaK5f9B.png",
                 "power": "Bara Bara no Mi",
                 "backstory": (
@@ -1085,6 +1137,7 @@ SEED_ANIME: list[dict] = [
                 "name": "Smoker",
                 "faction": "Marines",
                 "role": "Marine Captain, Loguetown",
+                "height": "209 cm",
                 "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2753-Y2ja8Pl6PRs0.jpg",
                 "power": "Moku Moku no Mi",
                 "backstory": (
@@ -1099,6 +1152,7 @@ SEED_ANIME: list[dict] = [
                 "name": "Alvida",
                 "faction": "Alvida Pirates",
                 "role": "Captain, Alvida Pirates",
+                "height": "198 cm",
                 "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b4899-bFPCVRWyqMtO.jpg",
                 "backstory": (
                     "A pirate captain whose crew terrorized the seas near "
@@ -1111,6 +1165,7 @@ SEED_ANIME: list[dict] = [
                 "name": "Don Krieg",
                 "faction": "Krieg Pirates",
                 "role": "Captain, Krieg Pirates",
+                "height": "243 cm",
                 "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b9320-lHsw9jNk5889.png",
                 "backstory": (
                     "The self-proclaimed strongest man in the East Blue, "
@@ -1127,6 +1182,7 @@ SEED_ANIME: list[dict] = [
                 "name": "Arlong",
                 "faction": "Arlong Pirates",
                 "role": "Captain, Arlong Pirates",
+                "height": "263 cm",
                 "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b4887-hMOqSSpR5jFc.jpg",
                 "backstory": (
                     "A powerful Fish-Man pirate captain who rules the East "
@@ -1165,6 +1221,7 @@ SEED_ANIME: list[dict] = [
                 "name": "Wapol",
                 "faction": "Bliking Pirates",
                 "role": "Captain, Bliking Pirates",
+                "height": "208 cm",
                 "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b5422-QfzPleyyng7n.jpg",
                 "backstory": (
                     "The deposed king of Drum Kingdom turned pirate captain, "
@@ -1173,6 +1230,403 @@ SEED_ANIME: list[dict] = [
                 ),
                 # Drum Island arc start, verified against Wikipedia's episode list.
                 "first_revealed_at": "S1E78",
+            },
+            {
+                "name": "Monkey D. Garp",
+                "faction": "Marines",
+                "role": "Vice Admiral, Marines",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b8064-dPltKaZ8RAsj.jpg",
+                "backstory": (
+                    "A legendary Vice Admiral of the Marines known as the \"Hero of "
+                    "the Marines,\" famous for cornering the Pirate King himself. His "
+                    "blunt, larger-than-life approach to discipline is as feared by "
+                    "his own recruits as it is by pirates."
+                ),
+                # Koby/Helmeppo training arc start, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E68",
+            },
+            {
+                "name": "Sengoku",
+                "faction": "Marines",
+                "role": "Fleet Admiral, Marines",
+                "height": "278 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b13018-kJjHsIg6Zw7Q.png",
+                "backstory": (
+                    "The Fleet Admiral commanding the full might of the Marines, "
+                    "known to the world as \"Sengoku the Buddha.\" His word carries "
+                    "final authority over how the World Government's military "
+                    "responds to any pirate threat."
+                ),
+                # First appears convening the Warlords to discuss Crocodile's
+                # replacement, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E151",
+            },
+            {
+                "name": "Kuzan",
+                "faction": "Marines",
+                "role": "Admiral, Marines",
+                "height": "303 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2752-0ENS2a39muDz.png",
+                "power": "Hie Hie no Mi",
+                "backstory": (
+                    "One of the Marines' three Admirals, nicknamed \"Aokiji.\" A "
+                    "famously laid-back officer whose Devil Fruit lets him freeze "
+                    "entire stretches of ocean solid."
+                ),
+                # Water 7 arc opener, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E227",
+            },
+            {
+                "name": "Borsalino",
+                "faction": "Marines",
+                "role": "Admiral, Marines",
+                "height": "302 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b21093-Pc4kOjUn3ZkZ.png",
+                "power": "Pika Pika no Mi",
+                "backstory": (
+                    "One of the Marines' three Admirals, nicknamed \"Kizaru.\" His "
+                    "Devil Fruit lets him move and attack at the speed of light, "
+                    "making him one of the fastest fighters in the Marines."
+                ),
+                # Sabaody Archipelago World Noble incident, verified against
+                # Wikipedia's episode list.
+                "first_revealed_at": "S1E398",
+            },
+            {
+                "name": "Sakazuki",
+                "faction": "Marines",
+                "role": "Admiral, Marines",
+                "height": "306 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b22687-tCQVpj6wZhRk.jpg",
+                "power": "Magu Magu no Mi",
+                "backstory": (
+                    "One of the Marines' three Admirals, nicknamed \"Akainu.\" His "
+                    "molten-magma Devil Fruit and unbending belief in \"absolute "
+                    "justice\" make him the most ruthless of the three."
+                ),
+                # Marineford arc's dedicated three-Admirals introduction episode,
+                # verified against Wikipedia's episode list — deliberately used
+                # instead of his earlier Ohara-flashback cameo (S1E278), which is
+                # tied up in Robin's own gated backstory.
+                "first_revealed_at": "S1E458",
+            },
+            {
+                "name": "Dracule Mihawk",
+                "faction": "Seven Warlords of the Sea",
+                "role": "Member, Seven Warlords of the Sea — World's Greatest Swordsman",
+                "height": "198 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/n2064-OpnF4nLi6bvL.png",
+                "backstory": (
+                    "Widely regarded as the world's single greatest swordsman, "
+                    "wielding the black blade Yoru. His brief clash with a young "
+                    "swordsman named Zoro leaves a lasting mark on the boy's "
+                    "ambitions."
+                ),
+                # East Blue Saga, Zoro duel, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E24",
+            },
+            {
+                "name": "Donquixote Doflamingo",
+                "faction": "Seven Warlords of the Sea",
+                "role": "Member, Seven Warlords of the Sea",
+                "height": "305 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2754-B4gGSlNYgsyh.jpg",
+                "backstory": (
+                    "Captain of the Donquixote Pirates, holding a seat among the "
+                    "Seven Warlords of the Sea despite his crew's reputation for "
+                    "brutality."
+                ),
+                # Same Warlord-assembly appearance as Sengoku/Kuma, verified
+                # against Wikipedia's episode list.
+                "first_revealed_at": "S1E151",
+            },
+            {
+                "name": "Bartholomew Kuma",
+                "faction": "Seven Warlords of the Sea",
+                "role": "Member, Seven Warlords of the Sea",
+                "height": "689 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b7453-c3MArieFBs9w.png",
+                "backstory": (
+                    "A hulking, near-silent Warlord of the Sea, known for his calm "
+                    "demeanor and immense, poorly-understood power."
+                ),
+                # Warlord-assembly appearance, verified against Wikipedia's episode
+                # list. His Revolutionary Army past is a much later reveal, deliberately
+                # left out here.
+                "first_revealed_at": "S1E151",
+            },
+            {
+                "name": "Gecko Moria",
+                "faction": "Seven Warlords of the Sea",
+                "role": "Member, Seven Warlords of the Sea",
+                "height": "689 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b7454-WN77wNFvGtp8.png",
+                "power": "Kage Kage no Mi",
+                "backstory": (
+                    "A Warlord of the Sea who commands the haunted island of "
+                    "Thriller Bark, using his shadow-manipulating Devil Fruit to "
+                    "build an army of unnatural soldiers."
+                ),
+                # Thriller Bark arc start, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E337",
+            },
+            {
+                "name": "Boa Hancock",
+                "faction": "Seven Warlords of the Sea",
+                "role": "Member, Seven Warlords of the Sea — Empress of the Kuja",
+                "height": "191 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b16342-kVOF6V5Q94go.png",
+                "power": "Mero Mero no Mi",
+                "backstory": (
+                    "Empress of the all-female Kuja tribe on Amazon Lily and a "
+                    "Warlord of the Sea, capable of turning anyone infatuated with "
+                    "her to stone."
+                ),
+                # Amazon Lily arc, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E490",
+            },
+            {
+                "name": "Charlotte Linlin",
+                "faction": "Big Mom Pirates",
+                # Not "— one of the Four Emperors (Yonko)": she's dethroned at S1E1040
+                # (Wano). A permanent claim in this always-shown field would still be
+                # wrong at every later checkpoint. Status lives in the dated facts below.
+                "role": "Captain, Big Mom Pirates",
+                "height": "880 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b54495-3x1TzSzPEOLd.jpg",
+                "power": "Soru Soru no Mi",
+                "backstory": (
+                    "Captain of the Big Mom Pirates and one of the four Emperors "
+                    "ruling the New World, feared for her monstrous strength and "
+                    "her Homies — living objects animated from stolen souls."
+                ),
+                # Verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E571",
+            },
+            {
+                "name": "Kaido",
+                "faction": "Beast Pirates",
+                # Not "— one of the Four Emperors (Yonko)": he's dethroned at S1E1076
+                # (Wano). A permanent claim in this always-shown field would still be
+                # wrong at every later checkpoint. Status lives in the dated facts below.
+                "role": "Captain, Beast Pirates",
+                "height": "710 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b46109-MT7Hm4Bk93In.png",
+                "power": "Uo Uo no Mi, Model: Azure Dragon",
+                "backstory": (
+                    "Captain of the Beast Pirates and one of the four Emperors "
+                    "ruling the New World, known across the seas as the "
+                    "\"Strongest Creature in the World.\""
+                ),
+                # Dressrosa arc, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E739",
+            },
+            {
+                "name": "Marshall D. Teach",
+                "faction": "Whitebeard Pirates",
+                # Deliberately generic: at this point in the story he is a low-ranked,
+                # easily-overlooked Whitebeard crew member — no captain/commander rank,
+                # no mention of his own future crew. Naming his later betrayal or the
+                # Blackbeard Pirates here would leak a major reveal hundreds of
+                # episodes early.
+                "role": "Whitebeard Pirates crew member",
+                "height": "344 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b3331-7ZJDc4BNv9Yp.jpg",
+                "backstory": (
+                    "A little-known member of the Whitebeard Pirates, more often "
+                    "found relaxing in port towns than fighting alongside his crew."
+                ),
+                # Jaya Arc, Mock Town, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E146",
+            },
+            {
+                "name": "Monkey D. Dragon",
+                "faction": "Revolutionary Army",
+                "role": "Leader, Revolutionary Army",
+                # No AniList character page exists for Dragon as of this writing
+                # (confirmed via a full paginated scan of One Piece's 500-entry
+                # AniList cast list) — left null rather than fabricated.
+                "avatar_url": None,
+                "backstory": (
+                    "A mysterious, immensely powerful man known across the world "
+                    "as the leader of the Revolutionary Army — the organization "
+                    "openly opposing the World Government."
+                ),
+                # Loguetown arc, verified against Wikipedia's episode list. His
+                # relation to Luffy is a separate, later-gated fact (see below).
+                "first_revealed_at": "S1E52",
+            },
+            {
+                "name": "Sabo",
+                "faction": "Revolutionary Army",
+                "role": "Chief of Staff, Revolutionary Army — one of Luffy's sworn brothers",
+                "height": "187 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b32893-3weZS61cdwLD.png",
+                "power": "Mera Mera no Mi",
+                "backstory": (
+                    "Chief of Staff of the Revolutionary Army, presumed dead for "
+                    "over a decade before reuniting with Luffy at Dressrosa — one "
+                    "of the two brothers Luffy grew up with."
+                ),
+                # Dressrosa reveal episode, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E679",
+            },
+            {
+                "name": "Emporio Ivankov",
+                "faction": "Revolutionary Army",
+                "role": "Commander, Revolutionary Army — former Queen of the Kamabakka Kingdom",
+                "height": "449 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/22646.jpg",
+                "power": "Horu Horu no Mi",
+                "backstory": (
+                    "A high-ranking Revolutionary Army commander who rules the "
+                    "Kamabakka Kingdom and wields a Devil Fruit that manipulates "
+                    "hormones, capable of feats from rapid healing to full "
+                    "physical transformation."
+                ),
+                # Impel Down Level 5.5, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E438",
+            },
+            {
+                "name": "Trafalgar Law",
+                "faction": "Heart Pirates",
+                "role": "Captain, Heart Pirates",
+                "height": "191 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b13767-U604OJN9dxCn.jpg",
+                "power": "Ope Ope no Mi",
+                "backstory": (
+                    "Captain of the Heart Pirates and one of the eleven \"Worst "
+                    "Generation\" rookies who converge on Sabaody Archipelago, each "
+                    "with a bounty over 100 million."
+                ),
+                # Sabaody Archipelago arc, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E392",
+            },
+            {
+                "name": "Eustass Kid",
+                "faction": "Kid Pirates",
+                "role": "Captain, Kid Pirates",
+                "height": "205 cm",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b14989-uykLqnBTdAc2.jpg",
+                "power": "Jiki Jiki no Mi",
+                "backstory": (
+                    "Captain of the Kid Pirates and one of the eleven \"Worst "
+                    "Generation\" rookies who converge on Sabaody Archipelago, "
+                    "notorious for his brutal, take-no-prisoners approach."
+                ),
+                # Sabaody Archipelago arc, verified against Wikipedia's episode list.
+                "first_revealed_at": "S1E392",
+            },
+            {
+                "name": "Issho",
+                "faction": "Marines",
+                "role": "Admiral, Marines",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b82259-NFdvvcSHup7Z.jpg",
+                "power": "Zushi Zushi no Mi",
+                "backstory": (
+                    "A blind Marine Admiral who fights using his Devil Fruit's "
+                    "control over gravity, guided by a fiercely independent "
+                    "sense of justice that often puts him at odds with his own "
+                    "superiors."
+                ),
+                "first_revealed_at": "S1E630",
+            },
+            {
+                "name": "Aramaki",
+                "faction": "Marines",
+                "role": "Admiral, Marines",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b271788-IkVQTycoaNPY.png",
+                "power": "Ryu Ryu no Mi, Model: Vegeta",
+                "backstory": (
+                    "One of the Marines' newest Admirals, wielding a "
+                    "plant-based Devil Fruit and a famously blunt, dismissive "
+                    "attitude toward anyone he considers beneath him."
+                ),
+                "first_revealed_at": "S1E882",
+            },
+            {
+                "name": "Marco",
+                "faction": "Whitebeard Pirates",
+                "role": "1st Division Commander, Whitebeard Pirates",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b9323-tGArly93xBZv.png",
+                "power": "Tori Tori no Mi, Model: Phoenix",
+                "backstory": (
+                    "First Division Commander of the Whitebeard Pirates and "
+                    "the crew's second-in-command, capable of transforming "
+                    "into a phoenix that grants him powerful regenerative "
+                    "flames."
+                ),
+                "first_revealed_at": "S1E458",
+            },
+            {
+                "name": "Jozu",
+                "faction": "Whitebeard Pirates",
+                "role": "3rd Division Commander, Whitebeard Pirates",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/21559.jpg",
+                "backstory": (
+                    "Third Division Commander of the Whitebeard Pirates, "
+                    "renowned for a body that can harden into an unbreakable "
+                    "diamond in combat."
+                ),
+                "first_revealed_at": "S1E458",
+            },
+            {
+                "name": "Vista",
+                "faction": "Whitebeard Pirates",
+                "role": "5th Division Commander, Whitebeard Pirates",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b27202-0ck7epXFLmls.jpg",
+                "backstory": (
+                    "Fifth Division Commander of the Whitebeard Pirates, a "
+                    "master swordsman whose skill is respected even by the "
+                    "world's greatest swordsman."
+                ),
+                "first_revealed_at": "S1E458",
+            },
+            {
+                "name": "Benn Beckman",
+                "faction": "Red-Hair Pirates",
+                "role": "First Mate, Red-Hair Pirates",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b4882-2zsLPjqUeOJ4.png",
+                "backstory": (
+                    "First mate of the Red-Hair Pirates, a calm and steady "
+                    "sharpshooter whose judgment Shanks trusts above nearly "
+                    "anyone else's."
+                ),
+                "first_revealed_at": "S1E4",
+            },
+            {
+                "name": "Cabaji",
+                "faction": "Buggy Pirates",
+                "role": "Crew Member, Buggy Pirates",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b4897-3dFXuF1vcLJQ.jpg",
+                "backstory": (
+                    "An acrobatic swordsman of the Buggy Pirates, performing "
+                    "circus-style combat tricks atop a unicycle."
+                ),
+                "first_revealed_at": "S1E4",
+            },
+            {
+                "name": "Mohji",
+                "faction": "Buggy Pirates",
+                "role": "Crew Member, Buggy Pirates",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/4896.jpg",
+                "backstory": (
+                    "A beast tamer of the Buggy Pirates who fights alongside "
+                    "his pet lion, Richie."
+                ),
+                "first_revealed_at": "S1E4",
+            },
+            {
+                "name": "Charlotte Katakuri",
+                "faction": "Big Mom Pirates",
+                "role": "Sweet Commander, Big Mom Pirates",
+                "avatar_url": "https://s4.anilist.co/file/anilistcdn/character/large/b124077-TODX2ThCdyx2.png",
+                "power": "Mochi Mochi no Mi",
+                "backstory": (
+                    "One of the Big Mom Pirates' three Sweet Commanders and "
+                    "the second son of the Charlotte family."
+                ),
+                "first_revealed_at": "S1E825",
             },
         ],
         "franchise_entries": [
@@ -1428,6 +1882,679 @@ SEED_ANIME: list[dict] = [
                 "first_hinted_at": "S1E152",
                 "confidence": 0.9,
             },
+            {
+                "subject": "Monkey D. Dragon",
+                "predicate": "true_lineage",
+                "object": "Revealed to be Monkey D. Luffy's biological father.",
+                "source_citation": "Episode 314",
+                "first_revealed_at": "S1E314",
+                "first_hinted_at": "S1E52",
+                "confidence": 0.93,
+            },
+            # One fact per remaining character with zero temporal_fact coverage, so the
+            # per-character "revealed lore" panel is never empty once a character is
+            # visible — each mirrors that character's already-vetted `power`/`role`/
+            # `backstory` field (already shown unconditionally on their card at this same
+            # checkpoint), so none of these introduce any new spoiler exposure.
+            {
+                "subject": "Shanks",
+                "predicate": "reputation",
+                "object": "Recognized across the world as one of the Four Emperors (Yonko), among the most powerful pirates alive.",
+                "source_citation": "Episode 1",
+                "first_revealed_at": "S1E1",
+                "first_hinted_at": "S1E1",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Alvida",
+                "predicate": "combat_style",
+                "object": "Wields a giant spiked iron mace nearly as large as she is, relying on brute strength rather than any special power at this point in her career.",
+                "source_citation": "Episode 1",
+                "first_revealed_at": "S1E1",
+                "first_hinted_at": "S1E1",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Buggy",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Bara Bara no Mi, letting him split his body into separate, self-controlled pieces — immune to any bladed attack.",
+                "source_citation": "Episode 4",
+                "first_revealed_at": "S1E4",
+                "first_hinted_at": "S1E4",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Usopp",
+                "predicate": "combat_style",
+                "object": "A sharpshooter who fights with a slingshot, launching everything from simple pellets to his own exploding-star ammunition.",
+                "source_citation": "Episode 9",
+                "first_revealed_at": "S1E9",
+                "first_hinted_at": "S1E9",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Sanji",
+                "predicate": "combat_style",
+                "object": "Fights exclusively with powerful kicks, refusing to ever use his hands in a fight to protect them for cooking.",
+                "source_citation": "Episode 20",
+                "first_revealed_at": "S1E20",
+                "first_hinted_at": "S1E20",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Don Krieg",
+                "predicate": "notable_trait",
+                "object": "Commands a fleet of fifty ships and wears armor plating that hides an arsenal of concealed weapons, from hidden blades to poison gas.",
+                "source_citation": "Episode 21",
+                "first_revealed_at": "S1E21",
+                "first_hinted_at": "S1E21",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Dracule Mihawk",
+                "predicate": "combat_style",
+                "object": "Fights with the legendary black blade Yoru, the world's finest sword, and is skilled enough to casually parry attacks with a small knife alone.",
+                "source_citation": "Episode 24",
+                "first_revealed_at": "S1E24",
+                "first_hinted_at": "S1E24",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Arlong",
+                "predicate": "notable_trait",
+                "object": "A Fish-Man of immense physical strength, whose bite alone can shear through a rowboat, commanding a crew that treats humans as lesser beings.",
+                "source_citation": "Episode 31",
+                "first_revealed_at": "S1E31",
+                "first_hinted_at": "S1E31",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Smoker",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Moku Moku no Mi, letting him generate and become living smoke, so most physical attacks pass harmlessly through him.",
+                "source_citation": "Episode 48",
+                "first_revealed_at": "S1E48",
+                "first_hinted_at": "S1E48",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Monkey D. Garp",
+                "predicate": "title",
+                "object": "Known throughout the Marines and the pirate world alike as the \"Hero of the Marines,\" the man who once cornered the Pirate King, Gol D. Roger, himself.",
+                "source_citation": "Episode 68",
+                "first_revealed_at": "S1E68",
+                "first_hinted_at": "S1E68",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Dorry",
+                "predicate": "notable_trait",
+                "object": "A giant warrior of Elbaf, wielding a massive battle-axe, locked in a hundred-year duel with his rival and friend Brogy.",
+                "source_citation": "Episode 70",
+                "first_revealed_at": "S1E70",
+                "first_hinted_at": "S1E70",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Brogy",
+                "predicate": "notable_trait",
+                "object": "A giant warrior of Elbaf, wielding a massive broadsword, locked in a hundred-year duel with his rival and friend Dorry.",
+                "source_citation": "Episode 70",
+                "first_revealed_at": "S1E70",
+                "first_hinted_at": "S1E70",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Wapol",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Baku Baku no Mi, letting him devour anything and fuse it into his own body to reshape himself at will.",
+                "source_citation": "Episode 78",
+                "first_revealed_at": "S1E78",
+                "first_hinted_at": "S1E78",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Tony Tony Chopper",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Hito Hito no Mi, granting human intelligence, speech, and the ability to shift between several hybrid human-reindeer forms.",
+                "source_citation": "Episode 83",
+                "first_revealed_at": "S1E83",
+                "first_hinted_at": "S1E83",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Marshall D. Teach",
+                "predicate": "notable_trait",
+                "object": "An unassuming, easygoing member of the Whitebeard Pirates' lowest ranks, rarely seen taking part in his crew's battles.",
+                "source_citation": "Episode 146",
+                "first_revealed_at": "S1E146",
+                "first_hinted_at": "S1E146",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Edward Newgate",
+                "predicate": "title",
+                "object": "Known throughout the world as \"Whitebeard,\" carrying the title of the physically strongest man alive.",
+                "source_citation": "Episode 151",
+                "first_revealed_at": "S1E151",
+                "first_hinted_at": "S1E151",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Sengoku",
+                "predicate": "title",
+                "object": "Holds the Marines' highest rank, Fleet Admiral, giving him final authority over the organization's every major decision.",
+                "source_citation": "Episode 151",
+                "first_revealed_at": "S1E151",
+                "first_hinted_at": "S1E151",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Donquixote Doflamingo",
+                "predicate": "notable_trait",
+                "object": "A pirate captain who, despite his crew's fearsome reputation, holds a government-sanctioned seat among the Seven Warlords of the Sea.",
+                "source_citation": "Episode 151",
+                "first_revealed_at": "S1E151",
+                "first_hinted_at": "S1E151",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Bartholomew Kuma",
+                "predicate": "notable_trait",
+                "object": "A hulking, almost entirely silent Warlord of the Sea, rarely seen speaking even in the presence of his fellow Warlords.",
+                "source_citation": "Episode 151",
+                "first_revealed_at": "S1E151",
+                "first_hinted_at": "S1E151",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Franky",
+                "predicate": "notable_trait",
+                "object": "A cyborg shipwright who rebuilt much of his own body after a near-fatal accident, running many of his built-in weapons and tools on cola as fuel.",
+                "source_citation": "Episode 205",
+                "first_revealed_at": "S1E205",
+                "first_hinted_at": "S1E205",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Kuzan",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Hie Hie no Mi, letting him freeze massive stretches of open ocean solid at will.",
+                "source_citation": "Episode 227",
+                "first_revealed_at": "S1E227",
+                "first_hinted_at": "S1E227",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Brook",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Yomi Yomi no Mi, which returned his soul to his own skeletal remains decades after his original death.",
+                "source_citation": "Episode 337",
+                "first_revealed_at": "S1E337",
+                "first_hinted_at": "S1E337",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Gecko Moria",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Kage Kage no Mi, letting him steal shadows from the living and stitch them into an army of animated soldiers.",
+                "source_citation": "Episode 337",
+                "first_revealed_at": "S1E337",
+                "first_hinted_at": "S1E337",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Trafalgar Law",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Ope Ope no Mi, creating a spherical zone in which he can manipulate anything — including his own body and injuries — with surgical precision.",
+                "source_citation": "Episode 392",
+                "first_revealed_at": "S1E392",
+                "first_hinted_at": "S1E392",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Eustass Kid",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Jiki Jiki no Mi, letting him generate and control powerful magnetic fields to hurl scrap metal and machinery at his enemies.",
+                "source_citation": "Episode 392",
+                "first_revealed_at": "S1E392",
+                "first_hinted_at": "S1E392",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Borsalino",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Pika Pika no Mi, letting him move and attack at the speed of light.",
+                "source_citation": "Episode 398",
+                "first_revealed_at": "S1E398",
+                "first_hinted_at": "S1E398",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Jinbe",
+                "predicate": "combat_style",
+                "object": "A master of Fish-Man Karate, capable of devastating strikes powered by pressurized jets of expelled water.",
+                "source_citation": "Episode 432",
+                "first_revealed_at": "S1E432",
+                "first_hinted_at": "S1E432",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Emporio Ivankov",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Horu Horu no Mi, letting him inject hormones that produce effects ranging from rapid healing to full physical transformation.",
+                "source_citation": "Episode 438",
+                "first_revealed_at": "S1E438",
+                "first_hinted_at": "S1E438",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Sakazuki",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Magu Magu no Mi, letting him generate and control molten magma hot enough to melt through nearly anything.",
+                "source_citation": "Episode 458",
+                "first_revealed_at": "S1E458",
+                "first_hinted_at": "S1E458",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Boa Hancock",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Mero Mero no Mi, letting her turn anyone infatuated with her to stone with a single touch or glance.",
+                "source_citation": "Episode 490",
+                "first_revealed_at": "S1E490",
+                "first_hinted_at": "S1E490",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Charlotte Linlin",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Soru Soru no Mi, letting her rip pieces of soul from others and use them to animate ordinary objects into living \"Homies.\"",
+                "source_citation": "Episode 571",
+                "first_revealed_at": "S1E571",
+                "first_hinted_at": "S1E571",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Sabo",
+                "predicate": "devil_fruit_power",
+                "object": "Wields the Mera Mera no Mi, a Devil Fruit that grants full control over fire, letting him ignite his body and weapons at will.",
+                "source_citation": "Episode 679",
+                "first_revealed_at": "S1E679",
+                "first_hinted_at": "S1E679",
+                "confidence": 0.95,
+            },
+            {
+                "subject": "Kaido",
+                "predicate": "devil_fruit_power",
+                "object": "Ate the Uo Uo no Mi, Model: Azure Dragon, letting him transform into a colossal dragon capable of unleashing devastating elemental attacks.",
+                "source_citation": "Episode 739",
+                "first_revealed_at": "S1E739",
+                "first_hinted_at": "S1E739",
+                "confidence": 0.95,
+            },
+            # Bounty facts: each character's first publicly-documented bounty, added as
+            # a gated fact (not the static `bounty` column) to match the progressive-
+            # reveal architecture already used for Luffy — a bounty is spoiler-gated,
+            # not a static stat. Every episode below is verified against One Piece
+            # Wiki's own citation for that reveal, not guessed. Characters with a real
+            # bounty but no reliably-citable anime episode (Crocodile, Mihawk, Don
+            # Krieg, Ace, Kuma, Jinbe, Sabo, Kaido, Dorry, Brogy) and Alvida
+            # (databook-only, never shown on-screen) are deliberately left without a
+            # bounty fact rather than guessing a checkpoint.
+            {
+                "subject": "Roronoa Zoro",
+                "predicate": "bounty",
+                "object": "60,000,000",
+                "source_citation": "Episode 128",
+                "first_revealed_at": "S1E128",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Buggy",
+                "predicate": "bounty",
+                "object": "15,000,000",
+                "source_citation": "Episode 45",
+                "first_revealed_at": "S1E45",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Nami",
+                "predicate": "bounty",
+                "object": "16,000,000",
+                "source_citation": "Episode 320",
+                "first_revealed_at": "S1E320",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Usopp",
+                "predicate": "bounty",
+                "object": "200,000,000",
+                "source_citation": "Episode 746",
+                "first_revealed_at": "S1E746",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Sanji",
+                "predicate": "bounty",
+                "object": "77,000,000",
+                "source_citation": "Episode 320",
+                "first_revealed_at": "S1E320",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Arlong",
+                "predicate": "bounty",
+                "object": "20,000,000",
+                "source_citation": "Episode 31",
+                "first_revealed_at": "S1E31",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Tony Tony Chopper",
+                "predicate": "bounty",
+                "object": "50",
+                "source_citation": "Episode 320",
+                "first_revealed_at": "S1E320",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Nico Robin",
+                "predicate": "bounty",
+                "object": "80,000,000",
+                "source_citation": "Episode 320",
+                "first_revealed_at": "S1E320",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Franky",
+                "predicate": "bounty",
+                "object": "44,000,000",
+                "source_citation": "Episode 320",
+                "first_revealed_at": "S1E320",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Brook",
+                "predicate": "bounty",
+                "object": "33,000,000",
+                "source_citation": "Episode 381",
+                "first_revealed_at": "S1E381",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Marshall D. Teach",
+                "predicate": "bounty",
+                "object": "0 — notably has no bounty at all, despite already holding a Warlord seat.",
+                "source_citation": "Episode 369",
+                "first_revealed_at": "S1E369",
+                "first_hinted_at": None,
+                "confidence": 0.9,
+            },
+            {
+                "subject": "Edward Newgate",
+                "predicate": "bounty",
+                "object": "5,046,000,000",
+                "source_citation": "Episode 958",
+                "first_revealed_at": "S1E958",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Shanks",
+                "predicate": "bounty",
+                "object": "4,048,900,000",
+                "source_citation": "Episode 958",
+                "first_revealed_at": "S1E958",
+                "first_hinted_at": None,
+                "confidence": 0.85,
+            },
+            {
+                "subject": "Donquixote Doflamingo",
+                "predicate": "bounty",
+                "object": "340,000,000",
+                "source_citation": "Episode 151",
+                "first_revealed_at": "S1E151",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Gecko Moria",
+                "predicate": "bounty",
+                "object": "320,000,000",
+                "source_citation": "Episode 343",
+                "first_revealed_at": "S1E343",
+                "first_hinted_at": None,
+                "confidence": 0.9,
+            },
+            {
+                "subject": "Trafalgar Law",
+                "predicate": "bounty",
+                "object": "200,000,000",
+                "source_citation": "Episode 392",
+                "first_revealed_at": "S1E392",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Eustass Kid",
+                "predicate": "bounty",
+                "object": "315,000,000",
+                "source_citation": "Episode 392",
+                "first_revealed_at": "S1E392",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Boa Hancock",
+                "predicate": "bounty",
+                "object": "80,000,000",
+                "source_citation": "Episode 490",
+                "first_revealed_at": "S1E490",
+                "first_hinted_at": None,
+                "confidence": 0.9,
+            },
+            {
+                "subject": "Charlotte Linlin",
+                "predicate": "bounty",
+                "object": "50,000,000 (her first bounty, at age six)",
+                "source_citation": "Episode 838",
+                "first_revealed_at": "S1E838",
+                "first_hinted_at": None,
+                "confidence": 0.85,
+            },
+            # Yonko status is a temporal fact, not a fixed identity trait — it changes
+            # mid-story (defeat/death), exactly like a bounty. Each captain below gets a
+            # gain fact (at their own debut) and a loss fact (at the real episode their
+            # reign ends), instead of a permanent claim baked into static role text.
+            {
+                "subject": "Charlotte Linlin",
+                "predicate": "yonko_status",
+                "object": "Recognized as one of the Four Emperors (Yonko).",
+                "source_citation": "Episode 571",
+                "first_revealed_at": "S1E571",
+                "first_hinted_at": None,
+                "confidence": 0.93,
+            },
+            {
+                "subject": "Charlotte Linlin",
+                "predicate": "yonko_status_change",
+                "object": "Defeated by Trafalgar Law and Eustass Kid during the Wano Country arc, ending her reign as an Emperor.",
+                "source_citation": "Episode 1040",
+                "first_revealed_at": "S1E1040",
+                "first_hinted_at": None,
+                "confidence": 0.93,
+            },
+            {
+                "subject": "Kaido",
+                "predicate": "yonko_status",
+                "object": "Recognized as one of the Four Emperors (Yonko).",
+                "source_citation": "Episode 739",
+                "first_revealed_at": "S1E739",
+                "first_hinted_at": None,
+                "confidence": 0.93,
+            },
+            {
+                "subject": "Kaido",
+                "predicate": "yonko_status_change",
+                "object": "Defeated by Monkey D. Luffy during the Wano Country arc, ending his reign as an Emperor.",
+                "source_citation": "Episode 1076",
+                "first_revealed_at": "S1E1076",
+                "first_hinted_at": None,
+                "confidence": 0.93,
+            },
+            {
+                "subject": "Edward Newgate",
+                "predicate": "yonko_status",
+                "object": "Recognized as one of the Four Emperors (Yonko).",
+                "source_citation": "Episode 151",
+                "first_revealed_at": "S1E151",
+                "first_hinted_at": None,
+                "confidence": 0.93,
+            },
+            {
+                "subject": "Edward Newgate",
+                "predicate": "yonko_status_change",
+                "object": "Killed during the Battle of Marineford, ending the Whitebeard Pirates' era as one of the Four Emperors.",
+                "source_citation": "Episode 485",
+                "first_revealed_at": "S1E485",
+                "first_hinted_at": None,
+                "confidence": 0.93,
+            },
+            # Current Yonko lineup — dated facts, not permanent role claims, same
+            # lesson as the Big Mom/Kaido/Whitebeard fix above.
+            {
+                "subject": "Monkey D. Luffy",
+                "predicate": "yonko_status",
+                "object": "Recognized as a new Emperor of the Sea after Kaido's defeat in the Wano Country arc.",
+                "source_citation": "Episode 1081",
+                "first_revealed_at": "S1E1081",
+                "first_hinted_at": None,
+                "confidence": 0.9,
+            },
+            {
+                "subject": "Buggy",
+                "predicate": "yonko_status",
+                "object": "Revealed as the figurehead Emperor of the Cross Guild, alongside Dracule Mihawk and Crocodile.",
+                "source_citation": "Episode 1083",
+                "first_revealed_at": "S1E1083",
+                "first_hinted_at": None,
+                "confidence": 0.9,
+            },
+            {
+                "subject": "Marshall D. Teach",
+                "predicate": "yonko_status",
+                "object": "Recognized as one of the Four Emperors of the Sea.",
+                "source_citation": "Episode 917",
+                "first_revealed_at": "S1E917",
+                "first_hinted_at": None,
+                "confidence": 0.85,
+            },
+            # Seven Warlords of the Sea — the system was abolished, not repopulated
+            # with new members. One system-level fact plus each remaining member's
+            # individual exit (Crocodile and Doflamingo's exits were already implied
+            # by earlier facts; these make it explicit).
+            {
+                "subject": "Seven Warlords of the Sea",
+                "predicate": "system_abolished",
+                "object": "Formally abolished by the World Government during the Levely; all remaining Warlords had their bounties reinstated.",
+                "source_citation": "Episode 957",
+                "first_revealed_at": "S1E957",
+                "first_hinted_at": None,
+                "confidence": 0.93,
+            },
+            {
+                "subject": "Donquixote Doflamingo",
+                "predicate": "warlord_status_change",
+                "object": "Defeated and arrested at Dressrosa, later stripped of his Warlord title.",
+                "source_citation": "Episode 746",
+                "first_revealed_at": "S1E746",
+                "first_hinted_at": None,
+                "confidence": 0.9,
+            },
+            {
+                "subject": "Crocodile",
+                "predicate": "warlord_status_change",
+                "object": "Left the Warlords behind entirely, later co-founding the bounty-hunting Cross Guild alongside Dracule Mihawk and Buggy.",
+                "source_citation": "Episode 1083",
+                "first_revealed_at": "S1E1083",
+                "first_hinted_at": None,
+                "confidence": 0.9,
+            },
+            {
+                "subject": "Dracule Mihawk",
+                "predicate": "warlord_status_change",
+                "object": "Left the Warlords when the system was abolished, later co-founding the bounty-hunting Cross Guild alongside Crocodile and Buggy.",
+                "source_citation": "Episode 1083",
+                "first_revealed_at": "S1E1083",
+                "first_hinted_at": None,
+                "confidence": 0.9,
+            },
+            {
+                "subject": "Jinbe",
+                "predicate": "warlord_status_change",
+                "object": "Resigned as a Warlord, refusing to fight against the Whitebeard Pirates at Marineford.",
+                "source_citation": "Episode 466",
+                "first_revealed_at": "S1E466",
+                "first_hinted_at": None,
+                "confidence": 0.92,
+            },
+            {
+                "subject": "Boa Hancock",
+                "predicate": "warlord_status_change",
+                "object": "Lost Warlord status when the Seven Warlords system was formally abolished by the World Government.",
+                "source_citation": "Episode 957",
+                "first_revealed_at": "S1E957",
+                "first_hinted_at": None,
+                "confidence": 0.9,
+            },
+            {
+                "subject": "Gecko Moria",
+                "predicate": "warlord_status_change",
+                "object": "Lost Warlord status when the Seven Warlords system was formally abolished by the World Government.",
+                "source_citation": "Episode 957",
+                "first_revealed_at": "S1E957",
+                "first_hinted_at": None,
+                "confidence": 0.9,
+            },
+            {
+                "subject": "Bartholomew Kuma",
+                "predicate": "warlord_status_change",
+                "object": "Lost Warlord status when the Seven Warlords system was formally abolished by the World Government.",
+                "source_citation": "Episode 957",
+                "first_revealed_at": "S1E957",
+                "first_hinted_at": None,
+                "confidence": 0.9,
+            },
+            # Marine leadership succession.
+            {
+                "subject": "Sakazuki",
+                "predicate": "rank_change",
+                "object": "Ascended to Fleet Admiral after defeating Kuzan in a ten-day duel, succeeding the retired Sengoku.",
+                "source_citation": "Episode 881",
+                "first_revealed_at": "S1E881",
+                "first_hinted_at": None,
+                "confidence": 0.9,
+            },
+            {
+                "subject": "Kuzan",
+                "predicate": "rank_change",
+                "object": "Left the Marines after losing the Fleet Admiral succession duel against Sakazuki.",
+                "source_citation": "Episode 881",
+                "first_revealed_at": "S1E881",
+                "first_hinted_at": None,
+                "confidence": 0.9,
+            },
         ],
     },
 ]
@@ -1515,9 +2642,42 @@ async def seed_all(session: AsyncSession) -> None:
     await session.commit()
 
 
+async def seed_admin_user(session: AsyncSession) -> None:
+    """Idempotently ensures the single admin account exists, sourced from
+    ADMIN_EMAIL/ADMIN_PASSWORD in .env rather than hardcoded — those values are the
+    real login for a real account, so they must never live in source control. Skips
+    silently (logged) when unset, same degrade-gracefully pattern as SMTP/Gemini.
+
+    The password hash is only set on first creation — re-running this seed later
+    (e.g. after adding more anime data) must never silently overwrite a password the
+    admin has since changed via their own account settings."""
+    settings = get_settings()
+    if not settings.admin_email or not settings.admin_password:
+        logger.warning("ADMIN_EMAIL/ADMIN_PASSWORD not configured — skipping admin seed")
+        return
+
+    existing = await session.execute(select(User).where(User.email == settings.admin_email))
+    admin = existing.scalar_one_or_none()
+
+    if admin is None:
+        session.add(
+            User(
+                email=settings.admin_email,
+                hashed_password=hash_password(settings.admin_password),
+                is_verified=True,
+                is_admin=True,
+            )
+        )
+    elif not admin.is_admin:
+        admin.is_admin = True
+
+    await session.commit()
+
+
 async def main() -> None:
     async with AsyncSessionLocal() as session:
         await seed_all(session)
+        await seed_admin_user(session)
 
 
 if __name__ == "__main__":

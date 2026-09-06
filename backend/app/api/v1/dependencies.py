@@ -36,3 +36,14 @@ async def get_current_user(
         raise unauthorized
 
     return user
+
+
+async def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Builds on get_current_user: a valid token for a real user is not enough here,
+    that user must also carry is_admin — everything under /admin, plus anime import,
+    depends on this rather than get_current_user directly."""
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail={"message": "Admin access required"}
+        )
+    return current_user

@@ -27,6 +27,13 @@ body {
   color: var(--text);
 }
 
+/* Browsers default <button> to cursor: default (only <a> gets pointer natively),
+   so every custom button in the app reads as non-interactive on hover unless
+   overridden here once, globally, rather than per-component. */
+button:not(:disabled) {
+  cursor: pointer;
+}
+
 /* Theme-matched Custom Scrollbar */
 html {
   scrollbar-color: var(--sky) var(--background);

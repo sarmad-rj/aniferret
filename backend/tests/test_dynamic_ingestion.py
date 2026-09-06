@@ -547,25 +547,39 @@ async def test_import_anime_nests_pirate_crew_under_pirate_crews_faction(
 # --- endpoint ---
 
 
-def test_import_anime_endpoint_returns_201(client) -> None:
-    response = client.post("/api/v1/anime/import", json={"query": "Test Anime 6"})
+def test_import_anime_endpoint_returns_201(client, admin_auth_token) -> None:
+    response = client.post(
+        "/api/v1/anime/import",
+        json={"query": "Test Anime 6"},
+        headers={"Authorization": f"Bearer {admin_auth_token}"},
+    )
 
     assert response.status_code == 201
     assert response.json()["title"] == "Test Anime"
 
 
-def test_import_anime_endpoint_returns_404_when_unresolvable(client, monkeypatch) -> None:
+def test_import_anime_endpoint_returns_404_when_unresolvable(
+    client, monkeypatch, admin_auth_token
+) -> None:
     async def _unresolvable(query: str) -> None:
         return None
 
     monkeypatch.setattr(ingestion_service, "resolve_mal_id", _unresolvable)
 
-    response = client.post("/api/v1/anime/import", json={"query": "nonexistent"})
+    response = client.post(
+        "/api/v1/anime/import",
+        json={"query": "nonexistent"},
+        headers={"Authorization": f"Bearer {admin_auth_token}"},
+    )
 
     assert response.status_code == 404
 
 
-def test_import_anime_endpoint_rejects_empty_query(client) -> None:
-    response = client.post("/api/v1/anime/import", json={"query": ""})
+def test_import_anime_endpoint_rejects_empty_query(client, admin_auth_token) -> None:
+    response = client.post(
+        "/api/v1/anime/import",
+        json={"query": ""},
+        headers={"Authorization": f"Bearer {admin_auth_token}"},
+    )
 
     assert response.status_code == 422

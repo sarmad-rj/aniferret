@@ -18,7 +18,7 @@ function ImportSkeleton() {
   );
 }
 
-function ImportAnimeModal({ onImported, onClose }) {
+function ImportAnimeModal({ token, onImported, onClose }) {
   const [query, setQuery] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -36,7 +36,7 @@ function ImportAnimeModal({ onImported, onClose }) {
     setIsSubmitting(true);
 
     try {
-      const anime = await postImportAnime(trimmedQuery);
+      const anime = await postImportAnime(trimmedQuery, token);
       onImported(anime);
     } catch {
       setError(
