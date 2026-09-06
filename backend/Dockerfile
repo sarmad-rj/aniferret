@@ -40,11 +40,12 @@ ENV DATA_DIR=/app/data \
 WORKDIR /app
 COPY --chown=appuser:appuser . .
 
-# Mount a persistent volume at /app/data on the hosting platform — this is the
-# single directory that must survive restarts/redeploys (SQLite file + ChromaDB
-# store both live here, per config.py's DATA_DIR derivation).
+# Mount a Railway Volume at /app/data in this service's Railway dashboard settings
+# — this is the single directory that must survive restarts/redeploys (SQLite file
+# + ChromaDB store both live here, per config.py's DATA_DIR derivation). Do not use
+# the Docker VOLUME instruction here — Railway does not support it and rejects the
+# build; persistence is configured via Railway Volumes instead.
 RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
-VOLUME ["/app/data"]
 
 USER appuser
 
@@ -67,3 +68,4 @@ EXPOSE 8000
 # ${PORT:-8000} supports platforms (Render/Railway/Fly) that inject their own PORT
 # env var; falls back to 8000 for a plain `docker run`.
 CMD ["sh", "-c", "alembic upgrade head && python -m app.db.seed && python -m app.db.index_vectors && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+
