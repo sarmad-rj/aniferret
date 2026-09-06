@@ -3,7 +3,6 @@ import {
   ChevronDown,
   LayoutDashboard,
   LogOut,
-  User,
   UserCircle2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -23,20 +22,24 @@ function Header({ animeList, selectedSlug, onSelectAnime }) {
     logout();
   };
 
+  const avatarInitial = (user?.display_name ?? user?.email ?? "?")
+    .charAt(0)
+    .toUpperCase();
+
   return (
-    <header className="flex flex-wrap items-center justify-between gap-3 bg-[var(--primary)] px-4 py-3 sm:px-6">
-      <Link to="/" className="flex items-center gap-2">
+    <header className="flex flex-nowrap items-center justify-between gap-2 bg-[var(--primary)] px-4 py-3 sm:gap-3 sm:px-6">
+      <Link to="/" className="flex shrink-0 items-center gap-2">
         <img
           src={logo}
           alt="AniFerret logo"
-          className="h-11 w-11 rounded-full"
+          className="h-8 w-8 rounded-full sm:h-11 sm:w-11"
         />
-        <span className="text-xl font-bold text-[var(--surface)]">
+        <span className="hidden text-xl font-bold text-[var(--surface)] sm:inline">
           AniFerret
         </span>
       </Link>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-nowrap items-center gap-2">
         {animeList.length > 0 && (
           <AnimeSearchBar
             animeList={animeList}
@@ -46,15 +49,15 @@ function Header({ animeList, selectedSlug, onSelectAnime }) {
         )}
 
         {isAuthenticated ? (
-          <div className="relative">
+          <div className="relative shrink-0">
             <button
               type="button"
               onClick={() => setIsUserMenuOpen((previous) => !previous)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--primary-light)] bg-[var(--primary-light)] px-3 py-1.5 text-sm font-medium text-[var(--surface)]"
+              aria-label="Account menu"
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--primary-light)] bg-[var(--primary-light)] p-1 pr-1.5 text-sm font-medium text-[var(--surface)]"
             >
-              <User className="h-3.5 w-3.5 shrink-0" />
-              <span className="max-w-[7rem] truncate sm:max-w-[12rem]">
-                {user?.display_name ?? user?.email}
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--sky)] text-xs font-bold text-[var(--primary)]">
+                {avatarInitial}
               </span>
               <ChevronDown className="h-3.5 w-3.5 shrink-0" />
             </button>

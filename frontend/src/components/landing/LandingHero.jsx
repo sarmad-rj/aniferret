@@ -1,5 +1,6 @@
 import { Film } from "lucide-react";
 import CtaButton from "./CtaButton";
+import LandingSearchBar from "./LandingSearchBar";
 
 function LandingHero({ animeList }) {
   const covers = animeList.slice(0, 2);
@@ -19,10 +20,8 @@ function LandingHero({ animeList }) {
           it&apos;s safe to know, so a wiki, a friend, or your own curiosity can
           never spoil you again.
         </p>
-        <div className="flex flex-wrap items-center gap-3 pt-2">
-          <CtaButton to="/app" variant="solid">
-            Enter AniFerret
-          </CtaButton>
+        <div className="flex flex-col items-start gap-3 pt-2">
+          <LandingSearchBar animeList={animeList} />
           <CtaButton href="#how-it-works" variant="outline-primary">
             See How It Works
           </CtaButton>

@@ -1,6 +1,22 @@
+import { useMemo } from "react";
 import AnimeCoverCard from "../AnimeCoverCard";
 
+// This strip is a 4-wide teaser grid, not the full catalog (Discover, linked from
+// "Enter AniFerret", is where the whole collection lives) — picks a random 4 each
+// visit so the showcase stays fresh as the catalog grows past 4 titles instead of
+// always showing the same ones in insertion order.
+function pickRandomFour(animeList) {
+  const shuffled = [...animeList];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled.slice(0, 4);
+}
+
 function AnimeShowcaseStrip({ animeList, isLoading, error }) {
+  const featuredAnime = useMemo(() => pickRandomFour(animeList), [animeList]);
+
   return (
     <section
       id="anime"
@@ -36,7 +52,7 @@ function AnimeShowcaseStrip({ animeList, isLoading, error }) {
 
       {!error && !isLoading && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {animeList.map((anime) => (
+          {featuredAnime.map((anime) => (
             <AnimeCoverCard
               key={anime.slug}
               anime={anime}

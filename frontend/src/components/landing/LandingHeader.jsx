@@ -44,7 +44,7 @@ function LandingHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <CtaButton to="/app" variant="outline">
+          <CtaButton to="/app/discover" variant="outline">
             Enter AniFerret
           </CtaButton>
 

@@ -18,18 +18,20 @@ function DiscoverPage() {
       )}
 
       {!error && isLoading && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {["one", "two", "three", "four"].map((placeholderKey) => (
-            <div
-              key={placeholderKey}
-              className="h-72 animate-pulse rounded-lg border border-[var(--border)] bg-[var(--surface-warm)]"
-            />
-          ))}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {["one", "two", "three", "four", "five", "six"].map(
+            (placeholderKey) => (
+              <div
+                key={placeholderKey}
+                className="h-80 animate-pulse rounded-lg border border-[var(--border)] bg-[var(--surface-warm)]"
+              />
+            ),
+          )}
         </div>
       )}
 
       {!error && !isLoading && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {animeList.map((anime) => (
             <AnimeCoverCard
               key={anime.slug}
