@@ -44,7 +44,7 @@ COPY --chown=appuser:appuser . .
 # single directory that must survive restarts/redeploys (SQLite file + ChromaDB
 # store both live here, per config.py's DATA_DIR derivation).
 RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
-VOLUME ["/app/data"]
+
 
 USER appuser
 
