@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Dev-only persistent state — the container gets its own via the mounted volume
+aniferret.db
+chroma_store/
+
+.env
+.env.*
+!.env.example
+
+.git/
+.gitignore
