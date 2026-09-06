@@ -40,30 +40,25 @@ ENV DATA_DIR=/app/data \
 WORKDIR /app
 COPY --chown=appuser:appuser . .
 
-# Mount a persistent volume at /app/data on the hosting platform — this is the
-# single directory that must survive restarts/redeploys (SQLite file + ChromaDB
-# store both live here, per config.py's DATA_DIR derivation).
-RUN mkdir -p /app/data && chown -R appuser:appuser /app/data
-
+# Ensure /app/data directory exists with proper permissions
+RUN mkdir -p /app/data && chown -R appuser:appuser /app/data && chmod 755 /app/data
 
 USER appuser
 
 EXPOSE 8000
 
-# Boot sequence, every restart: migrate, then (re-)seed. `app.db.seed` and
-# `app.db.index_vectors` are both idempotent — seed_all() checks each anime's slug
-# before inserting, seed_admin_user() only creates/promotes (never overwrites a
-# changed password), and index_facts() upserts by fact_id — so on a fresh, empty
-# Railway volume this is what actually populates the launch-corpus anime/character
-# data and its vector index, and on every later boot it's a fast no-op.
-#
-# Deliberately NOT a "copy a pre-built database into the volume" step: the local
-# dev aniferret.db/chroma_store are gitignored (dev-only, and aniferret.db carries
-# live user rows with real password hashes — must never ship in an image), so a
-# platform building from the GitHub repo would never have them. seed_all() draws
-# from SEED_ANIME in app/db/seed.py instead — committed Python source, no binary
-# blob, and it never touches the `user` table at all.
-#
-# ${PORT:-8000} supports platforms (Render/Railway/Fly) that inject their own PORT
-# env var; falls back to 8000 for a plain `docker run`.
-CMD ["sh", "-c", "alembic upgrade head && python -m app.db.seed && python -m app.db.index_vectors && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Boot sequence with retry logic: wait for volume to stabilize before migrations
+CMD ["/bin/bash", "-c", "\
+  for attempt in {1..5}; do \
+    echo \"Attempt $attempt: waiting for volume to stabilize...\"; \
+    if [ -w /app/data ]; then \
+      echo \"Volume is writable\"; \
+      alembic upgrade head && python -m app.db.seed && python -m app.db.index_vectors && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}; \
+      exit $?; \
+    fi; \
+    sleep 2; \
+  done; \
+  echo \"ERROR: /app/data is not writable after 5 attempts\"; \
+  exit 1 \
+"]
+
