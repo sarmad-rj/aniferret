@@ -44,9 +44,18 @@ function LandingHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <CtaButton to="/app/discover" variant="outline">
-            Enter AniFerret
-          </CtaButton>
+          {/* Logo + wordmark + this button + the hamburger all compete for one
+              row's width — below ~366px their combined width (with real device
+              font metrics, which run slightly wider than headless-browser
+              testing showed) overflows before flex-wrap can save it. Hiding the
+              button here and surfacing it in the mobile drawer below keeps the
+              header's on-screen content to just logo + hamburger, which has
+              enough margin to never re-trigger this at any realistic width. */}
+          <span className="hidden min-[375px]:inline-flex">
+            <CtaButton to="/app/discover" variant="outline">
+              Enter AniFerret
+            </CtaButton>
+          </span>
 
           <button
             type="button"
@@ -65,6 +74,12 @@ function LandingHeader() {
 
       {isMenuOpen && (
         <nav className="mt-3 flex flex-col gap-3 border-t border-[var(--primary-light)] pt-3 sm:hidden">
+          <span className="min-[375px]:hidden">
+            <CtaButton to="/app/discover" variant="outline">
+              Enter AniFerret
+            </CtaButton>
+          </span>
+
           {ANCHOR_LINKS.map((link) => (
             <a
               key={link.label}
