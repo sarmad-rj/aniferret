@@ -1,4 +1,6 @@
+import asyncio
 import logging
+import socket
 from email.message import EmailMessage
 from email.utils import formataddr
 
@@ -24,7 +26,19 @@ async def _send_email(to_email: str, subject: str, html_body: str) -> None:
     fail-safe pattern for optional external services (see llm_synthesizer.py): a
     missing/broken mail provider degrades the feature, it never crashes the request
     that queued it. Callers always run this via BackgroundTasks, so there's no
-    response to fail regardless."""
+    response to fail regardless.
+
+    Resolves the SMTP host to an IPv4 address and connects that socket ourselves
+    (rather than letting aiosmtplib/uvloop's own connect pick whichever address
+    family DNS returns first) because Railway's container network was observed
+    silently black-holing outbound IPv6 to smtp.gmail.com — the SYN goes out, no
+    reply ever comes back, and the connection just hangs until aiosmtplib's own
+    timeout fires (SMTPConnectTimeoutError), while IPv4 to the same host connects
+    immediately. This doesn't weaken TLS: aiosmtplib's STARTTLS upgrade still runs
+    server_hostname=settings.smtp_host for certificate validation regardless of
+    which IP the socket is actually connected to (see SMTP.starttls/_create_
+    connection in aiosmtplib.smtp) — only the initial plaintext TCP connect is
+    forced onto IPv4."""
     settings = get_settings()
     if not settings.smtp_host or not settings.smtp_user or not settings.smtp_password:
         logger.warning("SMTP not configured — skipping email to %s (%s)", to_email, subject)
@@ -37,17 +51,32 @@ async def _send_email(to_email: str, subject: str, html_body: str) -> None:
     message.set_content("This email requires an HTML-capable client to view.")
     message.add_alternative(html_body, subtype="html")
 
+    loop = asyncio.get_running_loop()
+    raw_sock: socket.socket | None = None
     try:
+        addrinfo = await loop.getaddrinfo(
+            settings.smtp_host,
+            settings.smtp_port,
+            family=socket.AF_INET,
+            type=socket.SOCK_STREAM,
+        )
+        family, socktype, proto, _, sockaddr = addrinfo[0]
+        raw_sock = socket.socket(family, socktype, proto)
+        raw_sock.setblocking(False)
+        await loop.sock_connect(raw_sock, sockaddr)
+
         await aiosmtplib.send(
             message,
             hostname=settings.smtp_host,
-            port=settings.smtp_port,
             username=settings.smtp_user,
             password=settings.smtp_password,
             start_tls=True,
+            sock=raw_sock,  # aiosmtplib rejects passing `port` alongside `sock`
         )
     except Exception:
         logger.exception("Failed to send email to %s (%s)", to_email, subject)
+        if raw_sock is not None:
+            raw_sock.close()
 
 
 def _button_email_html(*, preheader: str, heading: str, body_text: str, button_label: str, link: str) -> str:
