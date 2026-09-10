@@ -38,20 +38,21 @@ class Settings(BaseSettings):
     fails closed rather than being silently insecure."""
     jwt_expire_minutes: int = 60 * 24 * 7
 
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_user: str = ""
-    smtp_password: str = ""
+    resend_api_key: str = ""
     emails_from: str = ""
-    """All left blank by default — matches gemini_api_key's pattern: email_service
-    checks for a configured host before attempting to send, so a dev environment
-    with no SMTP credentials degrades to a silent no-op (logged, not crashed)
-    instead of failing registration/reset requests."""
+    """Left blank by default — matches gemini_api_key's pattern: email_service
+    checks for a configured key before attempting to send, so a dev environment
+    with no Resend credentials degrades to a silent no-op (logged, not crashed)
+    instead of failing registration/reset requests. Sending goes over Resend's HTTPS
+    API rather than raw SMTP sockets: Railway (and many PaaS platforms) silently
+    black-holes outbound traffic on SMTP ports like 587/465, which no client-side
+    fix can work around, while HTTPS (443) is never blocked since it's how all
+    normal web traffic works."""
     frontend_url: str = "http://localhost:5173"
 
     admin_email: str = ""
     admin_password: str = ""
-    """Blank by default, same degrade-gracefully pattern as smtp_*/gemini_api_key —
+    """Blank by default, same degrade-gracefully pattern as resend_api_key/gemini_api_key —
     seed_admin_user() skips creating the admin account (logs a warning) rather than
     hardcoding real credentials in source, which would otherwise ship to version
     control in plaintext."""

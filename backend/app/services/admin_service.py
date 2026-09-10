@@ -147,7 +147,7 @@ async def list_user_summaries(db: AsyncSession) -> list[AdminUserSummary]:
 
 async def mark_user_verified(db: AsyncSession, user_id: int) -> None:
     """Manually verifies an account — a support fallback for when the verification
-    email never arrives (SMTP misconfiguration, spam filtering, a typo'd address),
+    email never arrives (Resend misconfiguration, spam filtering, a typo'd address),
     without requiring the user to still hold the original token."""
     user = await db.get(User, user_id)
     if user is None:

@@ -154,35 +154,33 @@ def _no_live_gemini_calls(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _no_live_smtp_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+def _no_live_email_calls(monkeypatch: pytest.MonkeyPatch) -> None:
     """Force the deterministic/no-op path by default in every test, regardless of
-    whether real SMTP credentials happen to be present in the ambient .env.
+    whether a real RESEND_API_KEY happens to be present in the ambient .env.
 
-    This assumption used to just be true by circumstance (no real SMTP creds were
-    ever configured) rather than being enforced — once real Gmail credentials were
-    added to .env earlier in this project's life, every test that calls
-    /auth/register, /auth/forgot-password, or /auth/resend-verification started
-    silently attempting real SMTP connections to Gmail on every single call. This
-    went unnoticed because email_service._send_email fails silently by design
-    (logged, not raised) — it only surfaced as a flaky test once a slow/failed
-    real connection attempt collided with test_rate_limiting.py's timing.
+    This assumption used to just be true by circumstance (no real mail-provider
+    creds were ever configured) rather than being enforced — once real SMTP
+    credentials were added to .env earlier in this project's life (since replaced
+    by Resend), every test that calls /auth/register, /auth/forgot-password, or
+    /auth/resend-verification started silently attempting real email sends on
+    every single call. This went unnoticed because email_service._send_email
+    fails silently by design (logged, not raised) — it only surfaced as a flaky
+    test once a slow/failed real connection attempt collided with
+    test_rate_limiting.py's timing.
 
-    Almost certainly a real contributor to live SMTP delivery problems too: this
-    suite calls those endpoints dozens of times per run, and has been run many
-    times this session -- hundreds of rapid, automated connection attempts to one
-    Gmail account is exactly the kind of pattern Google's abuse detection flags.
+    Almost certainly a real contributor to live delivery problems too: this suite
+    calls those endpoints dozens of times per run, and was run many times before
+    this fixture existed -- hundreds of rapid, automated sends to one account is
+    exactly the kind of pattern a mail provider's abuse detection flags.
     """
 
-    class _NoSmtpSettings:
-        smtp_host = ""
-        smtp_port = 587
-        smtp_user = ""
-        smtp_password = ""
+    class _NoEmailSettings:
+        resend_api_key = ""
         emails_from = ""
         app_name = "AniFerret"
         frontend_url = "http://localhost:5173"
 
-    monkeypatch.setattr(email_service, "get_settings", lambda: _NoSmtpSettings())
+    monkeypatch.setattr(email_service, "get_settings", lambda: _NoEmailSettings())
 
 
 @pytest.fixture(autouse=True)

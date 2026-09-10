@@ -994,7 +994,7 @@ def test_bulk_delete_users_rejects_unauthenticated_request(client: TestClient) -
     assert response.status_code == 401
 
 
-def test_system_status_reports_smtp_configured_state(
+def test_system_status_reports_email_configured_state(
     client: TestClient, admin_auth_token: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Monkeypatched rather than asserted against the ambient real .env -- this
@@ -1004,24 +1004,22 @@ def test_system_status_reports_smtp_configured_state(
     import app.api.v1.endpoints.admin as admin_endpoint
 
     class _ConfiguredSettings:
-        smtp_host = "smtp.example.com"
-        smtp_user = "user@example.com"
-        smtp_password = "secret"
+        resend_api_key = "re_123"
+        emails_from = "noreply@example.com"
 
     class _UnconfiguredSettings:
-        smtp_host = ""
-        smtp_user = ""
-        smtp_password = ""
+        resend_api_key = ""
+        emails_from = ""
 
     headers = {"Authorization": f"Bearer {admin_auth_token}"}
 
     monkeypatch.setattr(admin_endpoint, "get_settings", lambda: _ConfiguredSettings())
     configured_response = client.get("/api/v1/admin/system-status", headers=headers)
-    assert configured_response.json()["smtp_configured"] is True
+    assert configured_response.json()["email_configured"] is True
 
     monkeypatch.setattr(admin_endpoint, "get_settings", lambda: _UnconfiguredSettings())
     unconfigured_response = client.get("/api/v1/admin/system-status", headers=headers)
-    assert unconfigured_response.json()["smtp_configured"] is False
+    assert unconfigured_response.json()["email_configured"] is False
 
 
 def test_system_status_rejects_non_admin_user(client: TestClient) -> None:

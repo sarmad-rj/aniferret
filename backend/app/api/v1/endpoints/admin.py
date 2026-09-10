@@ -153,7 +153,7 @@ async def read_admin_system_status(
 ) -> AdminSystemStatus:
     settings = get_settings()
     return AdminSystemStatus(
-        smtp_configured=bool(settings.smtp_host and settings.smtp_user and settings.smtp_password)
+        email_configured=bool(settings.resend_api_key and settings.emails_from)
     )
 
 

@@ -84,12 +84,12 @@ function AdminOverviewPage() {
           <div className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
             <div
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                systemStatus?.smtp_configured
+                systemStatus?.email_configured
                   ? "bg-[var(--sky)]/25"
                   : "bg-[var(--pink-light)]"
               }`}
             >
-              {systemStatus?.smtp_configured ? (
+              {systemStatus?.email_configured ? (
                 <Mail className="h-5 w-5 text-[var(--primary)]" />
               ) : (
                 <MailWarning className="h-5 w-5 text-[var(--pink)]" />
@@ -99,23 +99,24 @@ function AdminOverviewPage() {
               <p className="text-sm font-bold text-[var(--primary)]">
                 {isStatusLoading
                   ? "…"
-                  : systemStatus?.smtp_configured
+                  : systemStatus?.email_configured
                     ? "Configured"
                     : "Not Configured"}
               </p>
               <p className="text-xs text-[var(--text-muted)]">
-                Email Delivery (SMTP)
+                Email Delivery (Resend)
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {!isStatusLoading && systemStatus && !systemStatus.smtp_configured && (
+      {!isStatusLoading && systemStatus && !systemStatus.email_configured && (
         <p className="mt-4 max-w-2xl rounded-lg border border-[var(--pink)] bg-[var(--pink-light)] p-4 text-xs text-[var(--primary)]">
-          SMTP isn&apos;t configured, so verification and password-reset emails
-          are silently skipped (logged, never sent). Use the Users page&apos;s
-          &quot;Mark Verified&quot; action to unblock an account manually.
+          Resend isn&apos;t configured, so verification and password-reset
+          emails are silently skipped (logged, never sent). Use the Users
+          page&apos;s &quot;Mark Verified&quot; action to unblock an account
+          manually.
         </p>
       )}
     </main>

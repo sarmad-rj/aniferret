@@ -139,12 +139,12 @@ class AdminCharacterWriteRequest(BaseModel):
 
 
 class AdminSystemStatus(BaseModel):
-    smtp_configured: bool = Field(
+    email_configured: bool = Field(
         ...,
         description=(
-            "Whether SMTP_HOST/SMTP_USER/SMTP_PASSWORD are all set — never the "
-            "values themselves. False means verification/reset emails silently "
-            "no-op (logged, not sent); see email_service._send_email."
+            "Whether RESEND_API_KEY/EMAILS_FROM are both set — never the values "
+            "themselves. False means verification/reset emails silently no-op "
+            "(logged, not sent); see email_service._send_email."
         ),
     )
 

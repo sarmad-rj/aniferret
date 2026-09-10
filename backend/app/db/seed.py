@@ -2646,7 +2646,7 @@ async def seed_admin_user(session: AsyncSession) -> None:
     """Idempotently ensures the single admin account exists, sourced from
     ADMIN_EMAIL/ADMIN_PASSWORD in .env rather than hardcoded — those values are the
     real login for a real account, so they must never live in source control. Skips
-    silently (logged) when unset, same degrade-gracefully pattern as SMTP/Gemini.
+    silently (logged) when unset, same degrade-gracefully pattern as Resend/Gemini.
 
     The password hash is only set on first creation — re-running this seed later
     (e.g. after adding more anime data) must never silently overwrite a password the
