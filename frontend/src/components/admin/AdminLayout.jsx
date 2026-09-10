@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   Film,
   LayoutDashboard,
   Loader2,
@@ -52,11 +53,16 @@ function AdminLayout() {
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--background)]">
       <aside className="flex h-full w-48 shrink-0 flex-col gap-1 overflow-y-auto border-r border-[var(--border)] bg-[var(--surface)] p-4">
+        <p className="mb-2 px-2 text-sm font-bold text-[var(--primary)]">
+          AniFerret Admin
+        </p>
+
         <Link
           to="/"
-          className="mb-4 px-2 text-sm font-bold text-[var(--primary)]"
+          className="mb-3 inline-flex items-center gap-1.5 px-2 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--primary)]"
         >
-          AniFerret Admin
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back to AniFerret
         </Link>
 
         {NAV_LINKS.map(({ label, to, icon: Icon }) => (
