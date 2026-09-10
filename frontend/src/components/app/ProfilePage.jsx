@@ -1,5 +1,10 @@
-import { useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import {
+  Link,
+  Navigate,
+  useNavigate,
+  useOutletContext,
+} from "react-router-dom";
 import {
   ArrowLeft,
   BadgeCheck,
@@ -92,8 +97,10 @@ function ProfilePage() {
   const [passwordSuccess, setPasswordSuccess] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  const isFirstImportVersionRef = useRef(true);
 
   const navigate = useNavigate();
+  const { watchProgressImportVersion } = useOutletContext();
   const {
     token,
     isAuthenticated,
@@ -104,7 +111,20 @@ function ProfilePage() {
     profile,
     isLoading: isProfileLoading,
     error: profileError,
+    refetch: refetchProfile,
   } = useProfile(token);
+
+  useEffect(() => {
+    // Skip the initial mount -- useProfile's own mount effect already fetches
+    // once; this only needs to re-fetch on later bumps (an import completed
+    // while already on this page, where Header/ProfilePage are persistent
+    // siblings under AppLayout, not remounted by the import itself).
+    if (isFirstImportVersionRef.current) {
+      isFirstImportVersionRef.current = false;
+      return;
+    }
+    refetchProfile();
+  }, [watchProgressImportVersion, refetchProfile]);
 
   const handlePasswordSubmit = async (event) => {
     event.preventDefault();

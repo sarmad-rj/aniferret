@@ -1,13 +1,7 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 
-async function request(path, options = {}) {
-  const { headers: extraHeaders, ...restOptions } = options;
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...extraHeaders },
-    ...restOptions,
-  });
-
+async function handleResponse(response) {
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     const error = new Error(
@@ -22,6 +16,16 @@ async function request(path, options = {}) {
   }
 
   return response.json();
+}
+
+async function request(path, options = {}) {
+  const { headers: extraHeaders, ...restOptions } = options;
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: { "Content-Type": "application/json", ...extraHeaders },
+    ...restOptions,
+  });
+
+  return handleResponse(response);
 }
 
 function authHeaders(token) {
@@ -124,6 +128,22 @@ export function saveWatchProgress(token, entries) {
     body: JSON.stringify({ entries }),
     headers: authHeaders(token),
   });
+}
+
+export async function importMalWatchProgress(token, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  // Bypasses request()/its hardcoded JSON Content-Type deliberately: a multipart
+  // upload needs the browser to set its own Content-Type (with the boundary), so
+  // only the Authorization header is set here.
+  const response = await fetch(`${API_BASE_URL}/me/watch-progress/import-mal`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: formData,
+  });
+
+  return handleResponse(response);
 }
 
 export function fetchProfile(token) {

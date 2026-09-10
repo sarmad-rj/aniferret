@@ -6,6 +6,7 @@ import DossiersPage from "./components/app/DossiersPage";
 import LoreAssistantPage from "./components/app/LoreAssistantPage";
 import WatchOrderPage from "./components/app/WatchOrderPage";
 import ProfilePage from "./components/app/ProfilePage";
+import ReviewImportedProgressPage from "./components/app/ReviewImportedProgressPage";
 import VerifyEmail from "./components/VerifyEmail";
 import ResetPassword from "./components/ResetPassword";
 import AdminLayout from "./components/admin/AdminLayout";
@@ -28,6 +29,10 @@ function App() {
         <Route path="lore-assistant" element={<LoreAssistantPage />} />
         <Route path="watch-order" element={<WatchOrderPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route
+          path="review-progress"
+          element={<ReviewImportedProgressPage />}
+        />
       </Route>
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Navigate to="overview" replace />} />

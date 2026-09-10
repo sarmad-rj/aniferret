@@ -34,6 +34,7 @@ from app.models.faction import Faction
 from app.models.temporal_fact import TemporalFact
 from app.services.faction_classifier import classify_affiliation
 from app.services.reveal_engine import InvalidCheckpointError, parse_checkpoint
+from app.services.slug_utils import slugify
 from app.services.vector_store import index_facts
 
 logger = logging.getLogger(__name__)
@@ -541,7 +542,7 @@ def extract_debut_episode(character_name: str, description: str, max_episode: in
 
 
 async def _generate_unique_slug(session: AsyncSession, title: str, mal_id: int) -> str:
-    base = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-") or f"anime-{mal_id}"
+    base = slugify(title) or f"anime-{mal_id}"
     candidate = base
     suffix = 2
     while True:

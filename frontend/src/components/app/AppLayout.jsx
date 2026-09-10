@@ -49,6 +49,8 @@ function AppLayout() {
   const [remoteProgressBySlug, setRemoteProgressBySlug] = useState({});
   const [progressLoadedForToken, setProgressLoadedForToken] =
     useState(undefined);
+  const [watchProgressImportVersion, setWatchProgressImportVersion] =
+    useState(0);
   const selectedSlugRef = useRef(selectedSlug);
 
   const { animeList, error: animeError } = useAnimeCatalog();
@@ -230,6 +232,39 @@ function AppLayout() {
     }
   };
 
+  const handleWatchProgressImported = (result) => {
+    setWatchProgressImportVersion((previous) => previous + 1);
+
+    if (!isAuthenticated || !token) {
+      return;
+    }
+
+    fetchWatchProgress(token)
+      .then((response) => {
+        const bySlug = {};
+        for (const entry of response.entries) {
+          bySlug[entry.anime_slug] = entry.checkpoint;
+        }
+        setRemoteProgressBySlug(bySlug);
+
+        // The "seed only if checkpoint is falsy" effect above only fills in a
+        // checkpoint once, on first load -- without this, an import landing on
+        // the anime the user is currently viewing would leave the visible slider
+        // stuck on its old position until they switched away and back.
+        const importedEntry = result.imported.find(
+          (entry) => entry.anime_slug === selectedAnime?.slug,
+        );
+        if (importedEntry) {
+          setCheckpoint(importedEntry.checkpoint);
+          setGroupCheckpoint(null);
+        }
+      })
+      .catch(() => {
+        // Non-fatal -- the import itself already succeeded and persisted; a
+        // failed refresh here just means the UI catches up next natural reload.
+      });
+  };
+
   const handleOpenGroupModal = () => {
     if (isAuthenticated) {
       setIsGroupModalOpen(true);
@@ -257,8 +292,10 @@ function AppLayout() {
         animeList={animeList}
         selectedSlug={selectedSlug}
         onSelectAnime={handleSelectAnime}
+        onWatchProgressImported={handleWatchProgressImported}
       />
-      {location.pathname !== "/app/profile" && <NavBar />}
+      {location.pathname !== "/app/profile" &&
+        location.pathname !== "/app/review-progress" && <NavBar />}
 
       {animeError && (
         <p className="mx-auto mt-6 max-w-6xl rounded-lg border border-[var(--pink)] bg-[var(--pink-light)] p-4 text-sm text-[var(--primary)]">
@@ -286,6 +323,7 @@ function AppLayout() {
           isRewatchMode,
           setIsRewatchMode,
           onOpenGroupModal: handleOpenGroupModal,
+          watchProgressImportVersion,
         }}
       />
 

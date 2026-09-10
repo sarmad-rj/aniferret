@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   ChevronDown,
+  FileUp,
   LayoutDashboard,
   LogOut,
   UserCircle2,
@@ -9,13 +10,20 @@ import { Link } from "react-router-dom";
 import logo from "../logo/AniFerret_Logo.png";
 import AnimeSearchBar from "./AnimeSearchBar";
 import AuthModal from "./AuthModal";
+import ImportMalModal from "./ImportMalModal";
 import { useAuth } from "../context/useAuth";
 
-function Header({ animeList, selectedSlug, onSelectAnime }) {
+function Header({
+  animeList,
+  selectedSlug,
+  onSelectAnime,
+  onWatchProgressImported,
+}) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isImportMalModalOpen, setIsImportMalModalOpen] = useState(false);
 
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, token, isAuthenticated, logout } = useAuth();
 
   const handleSignOut = () => {
     setIsUserMenuOpen(false);
@@ -72,6 +80,17 @@ function Header({ animeList, selectedSlug, onSelectAnime }) {
                   <UserCircle2 className="h-3.5 w-3.5" />
                   My Profile
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsUserMenuOpen(false);
+                    setIsImportMalModalOpen(true);
+                  }}
+                  className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-sm text-[var(--text)] hover:bg-[var(--surface-warm)]"
+                >
+                  <FileUp className="h-3.5 w-3.5" />
+                  Import MAL
+                </button>
                 {user?.is_admin && (
                   <Link
                     to="/admin"
@@ -106,6 +125,14 @@ function Header({ animeList, selectedSlug, onSelectAnime }) {
 
       {isAuthModalOpen && (
         <AuthModal onClose={() => setIsAuthModalOpen(false)} />
+      )}
+
+      {isImportMalModalOpen && (
+        <ImportMalModal
+          token={token}
+          onImportSuccess={onWatchProgressImported}
+          onClose={() => setIsImportMalModalOpen(false)}
+        />
       )}
     </header>
   );
